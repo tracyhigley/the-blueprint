@@ -220,6 +220,8 @@ export async function sendDueForBlueprint(
         box: "DROP",
         title: t.title,
         notes: fieldNoteNotes(t, opts.siteUrl, opts.today),
+        // a to-do the hub sent keeps its source and key, so closing it by key also closes this note
+        ...(t.external_key ? { tag: t.source, source: t.source, external_key: t.external_key } : {}),
         urgent: false,
         must: false,
         should: false,

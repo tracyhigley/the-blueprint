@@ -47,6 +47,9 @@ export type FutureTask = {
   done_at: string | null;
   last_done_at: string | null;
   sent_on: string | null;
+  /** set when the hub sent this task (see lib/hub-todos.ts) */
+  source?: string | null;
+  external_key?: string | null;
 };
 
 export const TITLE_MAX = 200;

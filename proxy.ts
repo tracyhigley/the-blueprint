@@ -10,6 +10,7 @@ const PUBLIC_PATHS = [
   "/auth/callback",
   "/auth/reset",
   "/api/capture",
+  "/api/hub-todos", // its own bearer token, checked in the routes
   "/api/cron/calendar-to-drop",
   "/onboarding",
 ];
