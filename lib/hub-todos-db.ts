@@ -2,7 +2,7 @@
 // blueprint_id. `admin` is the service-role client (the hub has no
 // signed-in user); loosely typed so the tests can use an in-memory fake.
 
-import type { HubTodo } from "./hub-todos";
+import { type HubTodo, noteWithLink } from "./hub-todos";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Db = any;
@@ -56,7 +56,7 @@ export async function upsertHubTodo(
     if (itemOpen) {
       const { error } = await admin
         .from("items")
-        .update({ title: t.title, notes: t.notes, modified_at: now })
+        .update({ title: t.title, notes: noteWithLink(t.notes, t.link), modified_at: now })
         .eq("blueprint_id", blueprintId)
         .eq("id", item.id);
       fail(error);
@@ -74,7 +74,7 @@ export async function upsertHubTodo(
   if ((item || future) && !t.reopen) return "closed";
 
   if (item) {
-    const { error } = await admin.from("items").update({ state: null, deleted_at: null }).eq("blueprint_id", blueprintId).eq("id", item.id);
+    const { error } = await admin.from("items").update({ state: null, deleted_at: null, title: t.title, notes: noteWithLink(t.notes, t.link) }).eq("blueprint_id", blueprintId).eq("id", item.id);
     fail(error);
   }
   if (future) {
@@ -105,7 +105,7 @@ export async function upsertHubTodo(
       user_id: ownerId,
       box: "DROP",
       title: t.title,
-      notes: t.notes,
+      notes: noteWithLink(t.notes, t.link),
       tag: t.source,
       source: t.source,
       external_key: t.key,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tokenMatches, validateHubTodo } from "./hub-todos";
+import { noteWithLink, tokenMatches, validateHubTodo } from "./hub-todos";
 import { closeHubTodo, listHubTodos, upsertHubTodo } from "./hub-todos-db";
 
 // ---------- tiny in-memory stand-in for the Supabase client ----------
@@ -117,6 +117,33 @@ describe("sending the same to-do twice", () => {
     await upsertHubTodo(db, BP, OWNER, todo());
     await upsertHubTodo(db, BP, OWNER, todo({ source: "author" }));
     expect(db.tables.items).toHaveLength(2);
+  });
+});
+
+describe("keeping the link on a Field Note", () => {
+  it("puts the link on the line after the note", () => {
+    expect(noteWithLink("Open Bank Connections.", "https://hub.example.com/settings/bank")).toBe(
+      "Open Bank Connections.\nhttps://hub.example.com/settings/bank",
+    );
+    expect(noteWithLink(null, "https://x.example.com")).toBe("https://x.example.com");
+    expect(noteWithLink("Just a note", null)).toBe("Just a note");
+    expect(noteWithLink(null, null)).toBeNull();
+  });
+  it("keeps the link in Field Notes when an undated to-do is added, updated and put back", async () => {
+    const db = fakeDb();
+    const link = "https://hub.example.com/settings/bank";
+    await upsertHubTodo(db, BP, OWNER, todo({ notes: "n", link }));
+    expect(db.tables.items[0].notes).toBe("n\n" + link);
+    await upsertHubTodo(db, BP, OWNER, todo({ notes: "n2", link }));
+    expect(db.tables.items[0].notes).toBe("n2\n" + link);
+    await closeHubTodo(db, BP, { source: "finance", key: "categorize-backlog:swb" });
+    await upsertHubTodo(db, BP, OWNER, todo({ notes: "n3", link, reopen: true }));
+    expect(db.tables.items[0].notes).toBe("n3\n" + link);
+  });
+  it("still stores the link as its own field for a dated to-do", async () => {
+    const db = fakeDb();
+    await upsertHubTodo(db, BP, OWNER, todo({ key: "dated", due_on: "2026-12-01", link: "https://x.example.com" }));
+    expect(db.tables.future_tasks[0]).toMatchObject({ link: "https://x.example.com", notes: null });
   });
 });
 

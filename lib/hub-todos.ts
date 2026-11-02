@@ -58,3 +58,9 @@ export function tokenMatches(authHeader: string | null, expected: string | undef
   for (let i = 0; i < given.length; i++) diff |= given.charCodeAt(i) ^ expected.charCodeAt(i);
   return diff === 0;
 }
+
+/** Field Notes have no link field, so an undated to-do keeps its link on the line after the note. */
+export function noteWithLink(notes: string | null, link: string | null): string | null {
+  const text = [notes, link].filter((x): x is string => !!x).join("\n");
+  return text || null;
+}
