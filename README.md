@@ -1,4 +1,4 @@
-# The Vault
+# The Blueprint
 
 ADHD-friendly task manager built around a banking metaphor: **drop** thoughts in, triage to **boxes**, withdraw from the **ATM**, work through the **counter**, file **documents** for reference. Replaces a 14-tab Google Sheet + Python pipeline with a single Next.js app.
 
@@ -32,7 +32,7 @@ lib/
   daily-plan.ts     classify + buildSchedule (the schedule logic)
   actions.ts        Server Actions
   data.ts           Read-side helpers
-  categories.ts     Boxes / Documents / Energies (configured per-vault)
+  categories.ts     Boxes / Documents / Energies (configured per-blueprint)
   shortcuts.tsx     Keyboard shortcut hook + cheat sheet
   supabase/         Server + client helpers
   types.ts          Domain types

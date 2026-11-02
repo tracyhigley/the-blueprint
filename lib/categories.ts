@@ -8,7 +8,7 @@
 //   COUNTER — obligations; carries `area`, `urgent`, `must`, `minutes`
 //
 // Buildings and documents all live in `settings` JSONB so
-// they're editable from the Settings UI. No defaults — vaults start empty.
+// they're editable from the Settings UI. No defaults — blueprints start empty.
 
 import { normalizeDocumentFolderKey } from "@/lib/document-folders";
 import { supabaseServer } from "./supabase/server";

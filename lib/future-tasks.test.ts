@@ -22,7 +22,7 @@ import {
   markDone,
   putBack,
   sendAllDue,
-  sendDueForVault,
+  sendDueForBlueprint,
 } from "./future-tasks-db";
 import { FutureTasksBoard } from "@/components/future-tasks-board";
 
@@ -35,7 +35,7 @@ function fakeDb(seed: Record<string, Row[]> = {}) {
     future_tasks: [],
     items: [],
     captures: [],
-    vaults: [],
+    blueprints: [],
     ...seed,
   };
   // When set, plain reads of future_tasks see this old snapshot (a second
@@ -148,8 +148,8 @@ function fakeDb(seed: Record<string, Row[]> = {}) {
   return { from, tables, state };
 }
 
-const V = "vault-1";
-const OTHER = "vault-2";
+const V = "blueprint-1";
+const OTHER = "blueprint-2";
 const USER = "user-1";
 
 function task(over: Partial<FutureTask>): FutureTask {
@@ -446,7 +446,7 @@ describe("database round trip", () => {
 
   it("morning job: Field Notes once per task, one Slack message, quiet when nothing's due", async () => {
     const db = fakeDb({
-      vaults: [
+      blueprints: [
         { id: V, owner_id: USER },
         { id: OTHER, owner_id: "user-2" },
       ],
@@ -506,7 +506,7 @@ describe("database round trip", () => {
       "Call &lt;Bob&gt; &amp; Sue (was due Oct 20)",
     );
 
-    const drops = db.tables.items.filter((i) => i.vault_id === V);
+    const drops = db.tables.items.filter((i) => i.blueprint_id === V);
     expect(drops.map((i) => i.title).sort()).toEqual([
       "Call <Bob> & Sue",
       "Pay rent",
@@ -537,16 +537,16 @@ describe("database round trip", () => {
   });
 
   it("a second run with an old copy of the list can't send a task twice", async () => {
-    const db = fakeDb({ vaults: [{ id: V, owner_id: USER }] });
+    const db = fakeDb({ blueprints: [{ id: V, owner_id: USER }] });
     const today = "2026-10-24";
     await addTask(db, V, USER, clean({ title: "Once", show_on: today }));
     db.state.stale = db.tables.future_tasks.map((r) => ({ ...r }));
     await new Promise((r) => setTimeout(r, 5)); // so updated_at changes
-    const first = await sendDueForVault(db, V, {
+    const first = await sendDueForBlueprint(db, V, {
       today,
       siteUrl: "https://bp.test",
     });
-    const second = await sendDueForVault(db, V, {
+    const second = await sendDueForBlueprint(db, V, {
       today,
       siteUrl: "https://bp.test",
     });

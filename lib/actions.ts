@@ -26,15 +26,15 @@ async function requireUser() {
   return { sb, user };
 }
 
-async function currentVaultId() {
+async function currentBlueprintId() {
   const { sb } = await requireUser();
   const { data } = await sb
-    .from("vault_members")
-    .select("vault_id")
+    .from("blueprint_members")
+    .select("blueprint_id")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return data?.vault_id as string | undefined;
+  return data?.blueprint_id as string | undefined;
 }
 
 // --- Daily Wellness Center defaults ---
@@ -95,7 +95,7 @@ const WELLNESS_CENTER_BUILDING_KEY = "THE_WELLNESS_CENTER";
  */
 async function ensureDailyWellnessCenterDefaults(
   sb: Awaited<ReturnType<typeof supabaseServer>>,
-  vaultId: string,
+  blueprintId: string,
   userId: string,
   date: string,
 ) {
@@ -103,7 +103,7 @@ async function ensureDailyWellnessCenterDefaults(
   await sb
     .from("items")
     .update({ deleted_at: new Date().toISOString(), today_order: null })
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .eq("box", "COUNTER")
     .is("deleted_at", null)
     .or("state.is.null,state.neq.done")
@@ -119,7 +119,7 @@ async function ensureDailyWellnessCenterDefaults(
   const { data: candidates } = await sb
     .from("items")
     .select("id, tag, state, created_at, actual_end")
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .eq("box", "COUNTER")
     .is("deleted_at", null)
     .in("tag", tags)
@@ -144,7 +144,7 @@ async function ensureDailyWellnessCenterDefaults(
   const { data: maxRow } = await sb
     .from("items")
     .select("today_order")
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .not("today_order", "is", null)
     .order("today_order", { ascending: false })
     .limit(1)
@@ -191,7 +191,7 @@ async function ensureDailyWellnessCenterDefaults(
     }
     nextOrder += 1;
     await sb.from("items").insert({
-      vault_id: vaultId,
+      blueprint_id: blueprintId,
       user_id: userId,
       box: "COUNTER",
       title: def.title,
@@ -220,10 +220,10 @@ const DayInputsSchema = z.object({
 
 export async function saveDayInputs(formData: FormData) {
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const parsed = DayInputsSchema.parse(Object.fromEntries(formData));
-  await sb.from("day_inputs").upsert({ ...parsed, vault_id: vaultId });
+  await sb.from("day_inputs").upsert({ ...parsed, blueprint_id: blueprintId });
   revalidatePath("/");
 }
 
@@ -234,12 +234,12 @@ export async function saveDayInputs(formData: FormData) {
 // so a plain update is safe — no upsert/insert path needed here.
 export async function saveDayScratchpad(date: string, text: string) {
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const { error } = await sb
     .from("day_inputs")
     .update({ scratchpad: text.trim() === "" ? null : text })
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .eq("date", date);
   if (error) throw new Error(error.message);
   revalidatePath("/");
@@ -266,8 +266,8 @@ export async function saveDayInputsPartial(
   patch: z.input<typeof PartialDayInputs>,
 ) {
   const { sb, user } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const parsed = PartialDayInputs.parse(patch);
 
   const { data: existing } = await sb
@@ -275,7 +275,7 @@ export async function saveDayInputsPartial(
     .select(
       "hours_available, creative, prob_solv, tie_break, end_of_day",
     )
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .eq("date", parsed.date)
     .maybeSingle();
   // Rebuilding the day should always start from a clean "on today" slate,
@@ -285,15 +285,15 @@ export async function saveDayInputsPartial(
     await sb
       .from("items")
       .update({ today_order: null })
-      .eq("vault_id", vaultId)
+      .eq("blueprint_id", blueprintId)
       .not("today_order", "is", null);
-    await ensureDailyWellnessCenterDefaults(sb, vaultId, user.id, parsed.date);
+    await ensureDailyWellnessCenterDefaults(sb, blueprintId, user.id, parsed.date);
   }
 
   const { data: settingsRow } = await sb
     .from("settings")
     .select("default_hours")
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .maybeSingle();
   const settingsHours = Number(settingsRow?.default_hours ?? 7);
 
@@ -325,7 +325,7 @@ export async function saveDayInputsPartial(
   }
 
   const merged = {
-    vault_id: vaultId,
+    blueprint_id: blueprintId,
     date: parsed.date,
     hours_available: hoursVal,
     creative: Number(parsed.creative ?? existing?.creative ?? 3),
@@ -338,7 +338,7 @@ export async function saveDayInputsPartial(
   };
 
   await sb.from("day_inputs").upsert(merged, {
-    onConflict: "vault_id,date",
+    onConflict: "blueprint_id,date",
     ignoreDuplicates: false,
   });
 
@@ -673,13 +673,13 @@ export async function updateItem(
 
 export async function createItem(box: string, title: string, extras: z.input<typeof ItemPatch> = {}) {
   const { sb, user } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const parsed = ItemPatch.parse(extras);
   const { data } = await sb
     .from("items")
     .insert({
-      vault_id: vaultId,
+      blueprint_id: blueprintId,
       user_id: user.id,
       box,
       title: title.trim(),
@@ -771,8 +771,8 @@ export async function applyAtmBoxBudgets(
   selections: z.input<typeof AtmBoxBudgetSchema>[],
 ) {
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
 
   const parsed = selections
     .map((s) => AtmBoxBudgetSchema.parse(s))
@@ -782,14 +782,14 @@ export async function applyAtmBoxBudgets(
   await sb
     .from("items")
     .update({ today_order: null })
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .eq("box", "ATM")
     .not("today_order", "is", null);
 
   const { data: maxToday } = await sb
     .from("items")
     .select("today_order")
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .is("deleted_at", null)
     .not("today_order", "is", null)
     .order("today_order", { ascending: false })
@@ -805,7 +805,7 @@ export async function applyAtmBoxBudgets(
     const { data: rows, error } = await sb
       .from("items")
       .select("id, minutes")
-      .eq("vault_id", vaultId)
+      .eq("blueprint_id", blueprintId)
       .eq("box", "ATM")
       .eq("category", sel.category)
       .is("deleted_at", null)
@@ -852,8 +852,8 @@ export async function addCustomBlock(opts: {
   startISO?: string;
 }) {
   const { sb, user } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const start = opts.startISO ? new Date(opts.startISO) : null;
   const end = start
     ? new Date(start.getTime() + opts.minutes * 60_000)
@@ -869,7 +869,7 @@ export async function addCustomBlock(opts: {
     .maybeSingle();
   const todayOrder = (max?.today_order ?? 0) + 1;
   await sb.from("items").insert({
-    vault_id: vaultId,
+    blueprint_id: blueprintId,
     user_id: user.id,
     box: "COUNTER",
     tag: null,
@@ -890,8 +890,8 @@ export async function addCustomBlock(opts: {
 // Documents: write markdown body for the single document row in a document box.
 export async function saveDocument(box: string, body: string, title?: string) {
   const { sb, user } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const { data: existing } = await sb
     .from("items")
     .select("id")
@@ -907,7 +907,7 @@ export async function saveDocument(box: string, body: string, title?: string) {
       .eq("id", existing.id);
   } else {
     await sb.from("items").insert({
-      vault_id: vaultId,
+      blueprint_id: blueprintId,
       user_id: user.id,
       box,
       title: title ?? box,
@@ -924,23 +924,23 @@ export async function saveDocument(box: string, body: string, title?: string) {
 // Blueprint & box config.
 export async function renameBlueprint(name: string) {
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
-  await sb.from("vaults").update({ name }).eq("id", vaultId);
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
+  await sb.from("blueprints").update({ name }).eq("id", blueprintId);
   revalidatePath("/", "layout");
 }
 
 export async function createMyBlueprint(name: string) {
   const { sb, user } = await requireUser();
   const { data: v, error } = await sb
-    .from("vaults")
+    .from("blueprints")
     .insert({ name: name.trim() || "The Blueprint", owner_id: user.id })
     .select("id")
     .single();
   if (error) throw error;
   await sb
-    .from("vault_members")
-    .insert({ vault_id: v.id, user_id: user.id, role: "owner" });
+    .from("blueprint_members")
+    .insert({ blueprint_id: v.id, user_id: user.id, role: "owner" });
   revalidatePath("/", "layout");
   return v.id;
 }
@@ -954,15 +954,15 @@ const BoxConfig = z.object({
 
 export async function saveBoxConfig(boxes: z.input<typeof BoxConfig>[]) {
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   let parsed;
   try {
     parsed = boxes.map((b) => BoxConfig.parse(b));
   } catch (e) {
     throw new Error(describeZodError(e) ?? "Invalid box settings.");
   }
-  await sb.from("settings").upsert({ vault_id: vaultId, boxes: parsed });
+  await sb.from("settings").upsert({ blueprint_id: blueprintId, boxes: parsed });
   revalidatePath("/", "layout");
 }
 
@@ -1008,8 +1008,8 @@ export async function saveDocumentConfig(
   keyMigrations?: DocumentKeyMigration[],
 ) {
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const prevDocs = await getDocuments();
   const prevKeys = new Set(prevDocs.map((d) => d.key));
   let parsed;
@@ -1027,10 +1027,10 @@ export async function saveDocumentConfig(
   const { data: row } = await sb
     .from("settings")
     .select("*")
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .maybeSingle();
   const rowObj = row as Record<string, unknown> | null;
-  const patch: Record<string, unknown> = { vault_id: vaultId };
+  const patch: Record<string, unknown> = { blueprint_id: blueprintId };
   if (rowObj && "documents" in rowObj) {
     patch.documents = parsed;
   } else if (rowObj && "records" in rowObj) {
@@ -1053,7 +1053,7 @@ export async function saveDocumentConfig(
     const { error } = await sb
       .from("items")
       .update({ box: to })
-      .eq("vault_id", vaultId)
+      .eq("blueprint_id", blueprintId)
       .eq("box", from)
       .is("deleted_at", null);
     if (error) throw new Error(error.message);
@@ -1130,12 +1130,12 @@ export async function renameDocument(key: string, labelRaw: string) {
     docs.map((d) => (d.key === key ? { ...d, label } : d)),
   );
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (vaultId) {
+  const blueprintId = await currentBlueprintId();
+  if (blueprintId) {
     const { error } = await sb
       .from("items")
       .update({ title: label })
-      .eq("vault_id", vaultId)
+      .eq("blueprint_id", blueprintId)
       .eq("box", key)
       .is("deleted_at", null);
     if (error) throw new Error(error.message);
@@ -1162,15 +1162,15 @@ export async function deleteDocument(key: string) {
 // Capture token — generated, persisted on the settings row, surfaced in /settings.
 export async function rotateCaptureToken() {
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const token =
     "bp_" +
     crypto.getRandomValues(new Uint8Array(24))
       .reduce((s, b) => s + b.toString(16).padStart(2, "0"), "");
   await sb
     .from("settings")
-    .upsert({ vault_id: vaultId, capture_token: token });
+    .upsert({ blueprint_id: blueprintId, capture_token: token });
   revalidatePath("/settings");
   return token;
 }
@@ -1178,9 +1178,9 @@ export async function rotateCaptureToken() {
 // Sealed state — persisted on the settings row so the door stays shut on refresh.
 export async function setSealed(sealed: boolean) {
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
-  await sb.from("settings").upsert({ vault_id: vaultId, sealed });
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
+  await sb.from("settings").upsert({ blueprint_id: blueprintId, sealed });
   revalidatePath("/", "layout");
 }
 
@@ -1190,13 +1190,13 @@ export async function addFieldNote(text: string, source: string = "mailslot") {
   const trimmed = text.trim();
   if (!trimmed) return;
   const { sb, user } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
 
   const { data: item, error: itemErr } = await sb
     .from("items")
     .insert({
-      vault_id: vaultId,
+      blueprint_id: blueprintId,
       user_id: user.id,
       box: "DROP",
       title: trimmed.slice(0, 200),
@@ -1212,7 +1212,7 @@ export async function addFieldNote(text: string, source: string = "mailslot") {
   if (!item?.id) throw new Error("Couldn't create item.");
 
   const { error: capErr } = await sb.from("captures").insert({
-    vault_id: vaultId,
+    blueprint_id: blueprintId,
     user_id: user.id,
     raw: trimmed,
     source,
@@ -1232,11 +1232,11 @@ const SettingsSchema = z.object({
 
 export async function saveSettings(formData: FormData) {
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const raw = Object.fromEntries(formData);
   const parsed = SettingsSchema.parse(raw);
-  await sb.from("settings").upsert({ ...parsed, vault_id: vaultId });
+  await sb.from("settings").upsert({ ...parsed, blueprint_id: blueprintId });
   revalidatePath("/settings");
 }
 
@@ -1249,8 +1249,8 @@ const InviteSchema = z.object({
 
 export async function inviteMember(formData: FormData) {
   const { user } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
 
   const parsed = InviteSchema.parse(Object.fromEntries(formData));
   const admin = supabaseAdmin();
@@ -1272,8 +1272,8 @@ export async function inviteMember(formData: FormData) {
     invitedUserId = invited.user.id;
   }
 
-  await admin.from("vault_members").upsert({
-    vault_id: vaultId,
+  await admin.from("blueprint_members").upsert({
+    blueprint_id: blueprintId,
     user_id: invitedUserId,
     role: parsed.role,
   });
@@ -1285,25 +1285,25 @@ export async function setMemberRole(
   memberUserId: string,
   role: "owner" | "editor",
 ) {
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const admin = supabaseAdmin();
   await admin
-    .from("vault_members")
+    .from("blueprint_members")
     .update({ role })
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .eq("user_id", memberUserId);
   revalidatePath("/settings/members");
 }
 
 export async function removeMember(memberUserId: string) {
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const admin = supabaseAdmin();
   await admin
-    .from("vault_members")
+    .from("blueprint_members")
     .delete()
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .eq("user_id", memberUserId);
   revalidatePath("/settings/members");
 }

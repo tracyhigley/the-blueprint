@@ -106,13 +106,13 @@ export async function getCurrentBlueprint() {
   if (!envReady()) return null;
   const sb = await supabaseServer();
   const { data } = await sb
-    .from("vault_members")
-    .select("vault_id, role, vault:vaults(id, name)")
+    .from("blueprint_members")
+    .select("blueprint_id, role, blueprint:blueprints(id, name)")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (!data) return null;
-  const v = data.vault as unknown as { id: string; name: string } | null;
+  const v = data.blueprint as unknown as { id: string; name: string } | null;
   return v ? { id: v.id, name: v.name, role: data.role as "owner" | "editor" } : null;
 }
 

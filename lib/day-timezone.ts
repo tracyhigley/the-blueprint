@@ -7,12 +7,12 @@ import { todayYmdInTz } from "@/lib/calendar-day-bounds";
  * so Date#getDate() alone rolls at UTC midnight; this fixes “today” to a chosen zone.
  *
  * Default `Etc/GMT+4` is a fixed UTC−4 offset (IANA `Etc/GMT` signs are inverted).
- * Override with the `VAULT_DAY_TIMEZONE` env var (e.g. `America/New_York` for US
+ * Override with the `BLUEPRINT_DAY_TIMEZONE` env var (e.g. `America/New_York` for US
  * Eastern with DST) — the env var name is unchanged so any existing Vercel config
  * keeps working.
  */
 export const DAY_TIMEZONE =
-  process.env.VAULT_DAY_TIMEZONE?.trim() || "Etc/GMT+4";
+  process.env.BLUEPRINT_DAY_TIMEZONE?.trim() || "Etc/GMT+4";
 
 export function todayYmd(): string {
   return todayYmdInTz(DAY_TIMEZONE);

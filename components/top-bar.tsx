@@ -21,8 +21,8 @@ export async function TopBar() {
   if (!user) return null;
 
   const { data: membership } = await sb
-    .from("vault_members")
-    .select("vault_id")
+    .from("blueprint_members")
+    .select("blueprint_id")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

@@ -24,25 +24,25 @@ export async function POST(
     const { id, action } = await params;
     if (!UUID_RE.test(id))
       throw new BadInput("that task isn't on this list any more");
-    const { sb, userId, vaultId } = await requireCtx();
+    const { sb, userId, blueprintId } = await requireCtx();
     let extra: Record<string, unknown> = {};
 
     switch (action) {
       case "edit": {
         const v = validateTask(await readJson(req));
         if (!v.ok) throw new BadInput(v.error);
-        await editTask(sb, vaultId, id, v.value);
-        extra.sent_to_field_notes = (await sendNowIfDue(vaultId)) > 0;
+        await editTask(sb, blueprintId, id, v.value);
+        extra.sent_to_field_notes = (await sendNowIfDue(blueprintId)) > 0;
         break;
       }
       case "done":
-        extra = await markDone(sb, vaultId, id, userId);
+        extra = await markDone(sb, blueprintId, id, userId);
         break;
       case "undo":
-        await putBack(sb, vaultId, id);
+        await putBack(sb, blueprintId, id);
         break;
       case "delete":
-        await deleteTask(sb, vaultId, id);
+        await deleteTask(sb, blueprintId, id);
         break;
       default:
         throw new BadInput("unknown action");

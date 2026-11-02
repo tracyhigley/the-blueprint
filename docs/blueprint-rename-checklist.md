@@ -1,3 +1,5 @@
+> **Status (Nov 2026): rename completed.** The database (`vaults` → `blueprints`, `vault_id` → `blueprint_id`, `vault_members` → `blueprint_members`), code, repo (`the-blueprint`), Vercel project and live URL (tracy-blueprint.vercel.app) have all been renamed. Kept as a record of the old → new terms.
+
 # Vault → Blueprint: terminology to reevaluate
 
 Working checklist for the rename. Grounded in the actual shipped app (`AGENTS.md` glossary + live pages), not just `SPEC.md` — the spec drifted from what's actually live in a few places (noted below). Go through in any order, a few at a time; just tell me which rows you've decided and what to call them.

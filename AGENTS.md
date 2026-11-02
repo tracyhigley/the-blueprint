@@ -1,4 +1,4 @@
-# AGENTS.md — How to work in The Vault
+# AGENTS.md — How to work in The Blueprint
 
 This file tells coding assistants (Claude, Cursor, etc.) how to work in this repo on the user's behalf.
 
@@ -8,7 +8,7 @@ This file tells coding assistants (Claude, Cursor, etc.) how to work in this rep
 
 ## Who the user is
 
-The Vault is an ADHD-friendly task manager. It replaces a 14-tab Google Sheet + Python pipeline with a single Next.js app. The user runs multiple businesses, has ADHD, and wants to keep customizing this app over time without learning developer vocabulary, running commands, or reading build errors.
+The Blueprint is an ADHD-friendly task manager. It replaces a 14-tab Google Sheet + Python pipeline with a single Next.js app. The user runs multiple businesses, has ADHD, and wants to keep customizing this app over time without learning developer vocabulary, running commands, or reading build errors.
 
 When the user says something to you, **assume they're describing the goal in plain English** and you do the technical work. Confirm in plain English when you're done. Do not show command output unless they ask.
 
@@ -32,10 +32,10 @@ When the user says something to you, **assume they're describing the goal in pla
 | "Add to today" (about an item) | Sets `today_order` on the item. The Counter page and the wizard's Step 5 review have a `+ TODAY` toggle for this. |
 | "Pick this for today" (about an ATM item) | Same — the ATM page calls it "Withdraw"; same `today_order` mechanic. |
 | "Move this to 3pm" / "Pin this at X" | Set `pinned: true` and `scheduledStart` to that time. Schedule auto-flows around pinned blocks. |
-| "Done" / "Cross it off" | Mark `state: 'done'`. The schedule block toasts "Done. Still safe in your vault." — the item stays in its box. |
+| "Done" / "Cross it off" | Mark `state: 'done'`. The item stays in its box. |
 | "Skip this" / "Not doing this today" | Mark `state: 'skipped'`. The block stays visible but dimmed; remaining schedule shifts. |
-| "Close the vault" / "Seal it" | Transition to the Sealed state (`/sealed`). Hides daily surfaces; adding field notes stays active. Doesn't change data. |
-| "Open the vault" / "Unseal it" | Exit Sealed, return to Today. |
+| "Seal it" | Transition to the Sealed state (`/sealed`). Hides daily surfaces; adding field notes stays active. Doesn't change data. |
+| "Unseal it" | Exit Sealed, return to Today. |
 | "Add X to field notes" | Create an item with `box: 'DROP'`, `title: 'X'`. The user can dictate this from Siri, the bookmarklet, ⌘K, or the /deposit page. |
 | "Move X to Y" | Update the item's `box` field. Triage from Drop sets destination + box at the same time. |
 
@@ -59,7 +59,7 @@ If a step requires technical knowledge, **you do it**. If something is genuinely
 
 - One plain sentence at a time. No bullet lists unless they asked.
 - Use their words back to them ("the heading" not "h1 element").
-- Confirm before destructive actions: *"This will delete the row from your live vault — okay?"*
+- Confirm before destructive actions: *"This will delete the row from your live Blueprint — okay?"*
 - After a deploy: *"Live now. Want me to open it?"*
 - After local: *"Running on your computer at localhost:3000."*
 - **Never** describe a problem with the cause if you can describe it with the symptom and a fix. ("The deploy didn't work — let me try again" is better than "TypeScript error in app/page.tsx line 47.")
@@ -88,15 +88,13 @@ app/
   drop/                   Triage inbox
   atm/                    Energy-matched optional pulls
   counter/                Obligations
-  vault/, vault/[box]/    Long-term storage
   documents/[slug]/       Markdown documents (Notes, Measurements, etc.)
   build/                  Morning wizard
-  sealed/                 Closing-of-the-vault ceremonial state
+  sealed/                 End-of-day ceremonial state
   settings/               Settings hub
     boxes/                User-configured box list
     documents/            User-configured document list
     energies/             User-configured energy list
-    members/              Vault membership (invite / role / remove)
     connect/              iPhone + Mac setup walkthrough
   api/capture/            Bearer-auth POST endpoint for shortcuts
   deposit/                /deposit?t=… quick-add landing for the bookmarklet
@@ -136,10 +134,10 @@ docs/
    - Was being silently dropped in an earlier version. Make sure any change to `buildSchedule` keeps it in `maintPile`.
 
 6. **Done doesn't delete.**
-   - Marking a schedule block done sets `state: 'done'` and toasts "Still safe in your vault." Items stay in their box. Don't change this behavior.
+   - Marking a schedule block done sets `state: 'done'`. Items stay in their box. Don't change this behavior.
 
 7. **No "Tracy"-style copy or hardcoded data.**
-   - The app should work for any user out of the box. Box keys, documents, energies, day defaults are all configurable per-vault.
+   - The app should work for any user out of the box. Box keys, documents, energies, day defaults are all configurable per-blueprint.
 
 ---
 
@@ -237,7 +235,7 @@ The user's words are deliberate; map them back to code precisely.
 
 | User says | In the app |
 |---|---|
-| **The vault** | The whole app, also `/vault` (the storage interior). Boxes + documents live here. |
+| **The Blueprint** | The whole app. In the database each user's data belongs to one `blueprints` row — every table carries `blueprint_id`, membership is in `blueprint_members`, and RLS uses `is_blueprint_member()` / `is_blueprint_owner()`. (These were `vaults` / `vault_id` before Nov 2026.) |
 | **The drop** | `/drop`. Untriaged inbox. New captures land here as `box: 'DROP'`. |
 | **The counter** | `/counter`. Obligations — `box: 'COUNTER'`, with `urgent` / `must` flags. |
 | **The ATM** | `/atm`. Energy-matched optional pulls — `box: 'ATM'`, with `energy` + `category`. |
@@ -246,7 +244,7 @@ The user's words are deliberate; map them back to code precisely.
 | **A document** | A user-configured text-first category (`settings.documents`). Routed to `/documents/<slug>`. |
 | **An energy** | A user-configured tag on ATM items (`settings.energies`) — Creative, Prob-Solv, etc. |
 | **Build the day** / **build today** | The morning wizard at `/build` (5–6 questions). Persists to `day_inputs`. |
-| **Seal it** / **close the vault** | Set `settings.sealed = true`. The Sealed page hides daily surfaces; adding field notes stays open. |
+| **Seal it** | Set `settings.sealed = true`. The Sealed page hides daily surfaces; adding field notes stays open. |
 | **Add a field note** | Create an item in `box: 'DROP'`. Surfaces: ⌘K, `/deposit`, Siri Shortcut, bookmarklet. |
 | **+ TODAY** / **on today's plan** | Sets `today_order` (rank). Default is null (not on today). Universal flag for both Counter and ATM. |
 | **Withdraw** | ATM-specific phrasing for the same `today_order` toggle. |

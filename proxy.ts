@@ -64,11 +64,11 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(login);
   }
 
-  // Authed but not yet a member of any vault → onboarding.
+  // Authed but not yet a member of any blueprint → onboarding.
   if (user && !isPublic && path !== "/onboarding") {
     const { data: membership } = await supabase
-      .from("vault_members")
-      .select("vault_id")
+      .from("blueprint_members")
+      .select("blueprint_id")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();

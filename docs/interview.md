@@ -1,3 +1,5 @@
+> **Historical document.** Written when this app was called "The Vault". The app is now **The Blueprint**, and the vault terminology, routes, and some features described here no longer exist. See `AGENTS.md` for current names and structure.
+
 # The Vault — Interview Kit
 
 **Subject:** Tracy

@@ -16,7 +16,7 @@
 set -euo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/"
-WORK="${VERIFY_DIR:-/tmp/thevault-check}"
+WORK="${VERIFY_DIR:-/tmp/blueprint-check}"
 NEED_KB=$((1500 * 1024)) # node_modules (~800 MB) + copy + npm cache, with headroom
 
 mkdir -p "$WORK"

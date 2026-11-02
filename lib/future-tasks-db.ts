@@ -1,4 +1,4 @@
-// Future Tasks — database side. Every query filters by vault_id so each
+// Future Tasks — database side. Every query filters by blueprint_id so each
 // blueprint keeps its own list. `sb` is either the signed-in user's client
 // (RLS applies) or the service-role client for the morning job.
 
@@ -33,25 +33,25 @@ function fail(error: { message: string } | null | undefined): void {
 
 export async function listTasks(
   sb: Db,
-  vaultId: string,
+  blueprintId: string,
 ): Promise<FutureTask[]> {
   const { data, error } = await sb
     .from(TABLE)
     .select("*")
-    .eq("vault_id", vaultId);
+    .eq("blueprint_id", blueprintId);
   fail(error);
   return (data ?? []) as FutureTask[];
 }
 
 export async function getTask(
   sb: Db,
-  vaultId: string,
+  blueprintId: string,
   id: string,
 ): Promise<FutureTask> {
   const { data, error } = await sb
     .from(TABLE)
     .select("*")
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .eq("id", id)
     .maybeSingle();
   fail(error);
@@ -61,13 +61,13 @@ export async function getTask(
 
 export async function addTask(
   sb: Db,
-  vaultId: string,
+  blueprintId: string,
   userId: string,
   task: CleanTask,
 ): Promise<FutureTask> {
   const { data, error } = await sb
     .from(TABLE)
-    .insert({ ...task, vault_id: vaultId, created_by: userId })
+    .insert({ ...task, blueprint_id: blueprintId, created_by: userId })
     .select("*")
     .single();
   fail(error);
@@ -76,14 +76,14 @@ export async function addTask(
 
 async function patchTask(
   sb: Db,
-  vaultId: string,
+  blueprintId: string,
   id: string,
   patch: Record<string, unknown>,
 ): Promise<void> {
   const { data, error } = await sb
     .from(TABLE)
     .update(patch)
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .eq("id", id)
     .select("id");
   fail(error);
@@ -92,13 +92,13 @@ async function patchTask(
 
 export async function editTask(
   sb: Db,
-  vaultId: string,
+  blueprintId: string,
   id: string,
   task: CleanTask,
 ): Promise<void> {
-  await getTask(sb, vaultId, id);
+  await getTask(sb, blueprintId, id);
   // A new date means a fresh start: forget which date was last sent.
-  await patchTask(sb, vaultId, id, {
+  await patchTask(sb, blueprintId, id, {
     ...task,
     sent_on: null,
     updated_at: new Date().toISOString(),
@@ -108,16 +108,16 @@ export async function editTask(
 /** Done from the page: one-off → Done list; repeat → next date after today. */
 export async function markDone(
   sb: Db,
-  vaultId: string,
+  blueprintId: string,
   id: string,
   userId: string,
   today = futureTasksToday(),
 ): Promise<{ already?: true; next?: string }> {
-  const t = await getTask(sb, vaultId, id);
+  const t = await getTask(sb, blueprintId, id);
   if (t.done_at) return { already: true };
   const now = new Date().toISOString();
   if (t.repeat === "none") {
-    await patchTask(sb, vaultId, id, {
+    await patchTask(sb, blueprintId, id, {
       done_at: now,
       done_by: userId,
       updated_at: now,
@@ -125,7 +125,7 @@ export async function markDone(
     return {};
   }
   const next = nextAfter(t.due_on!, t.repeat, t.anchor_day, today);
-  await patchTask(sb, vaultId, id, {
+  await patchTask(sb, blueprintId, id, {
     due_on: next,
     last_done_at: now,
     sent_on: null,
@@ -136,13 +136,13 @@ export async function markDone(
 
 export async function putBack(
   sb: Db,
-  vaultId: string,
+  blueprintId: string,
   id: string,
   today = futureTasksToday(),
 ): Promise<void> {
-  const t = await getTask(sb, vaultId, id);
+  const t = await getTask(sb, blueprintId, id);
   if (!t.done_at) return;
-  await patchTask(sb, vaultId, id, {
+  await patchTask(sb, blueprintId, id, {
     ...putBackPatch(t, today, new Date().toISOString()),
     done_by: null,
   });
@@ -150,14 +150,14 @@ export async function putBack(
 
 export async function deleteTask(
   sb: Db,
-  vaultId: string,
+  blueprintId: string,
   id: string,
 ): Promise<void> {
-  await getTask(sb, vaultId, id);
+  await getTask(sb, blueprintId, id);
   const { error } = await sb
     .from(TABLE)
     .delete()
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .eq("id", id);
   fail(error);
 }
@@ -167,21 +167,21 @@ export async function deleteTask(
  * claimed first (an update guarded by its updated_at), so two overlapping
  * runs can never add the same task twice. Returns the tasks that went in.
  */
-export async function sendDueForVault(
+export async function sendDueForBlueprint(
   admin: Db,
-  vaultId: string,
+  blueprintId: string,
   opts: { today: string; siteUrl: string; now?: Date },
 ): Promise<FutureTask[]> {
-  const tasks = dueTasks(await listTasks(admin, vaultId), opts.today);
+  const tasks = dueTasks(await listTasks(admin, blueprintId), opts.today);
   if (tasks.length === 0) return [];
 
-  const { data: vault, error: vErr } = await admin
-    .from("vaults")
+  const { data: blueprint, error: vErr } = await admin
+    .from("blueprints")
     .select("owner_id")
-    .eq("id", vaultId)
+    .eq("id", blueprintId)
     .maybeSingle();
   fail(vErr);
-  if (!vault?.owner_id) return [];
+  if (!blueprint?.owner_id) return [];
 
   const sent: FutureTask[] = [];
   for (const t of tasks) {
@@ -191,7 +191,7 @@ export async function sendDueForVault(
     const { data: claimed, error: claimErr } = await admin
       .from(TABLE)
       .update(patch)
-      .eq("vault_id", vaultId)
+      .eq("blueprint_id", blueprintId)
       .eq("id", t.id)
       .eq("updated_at", t.updated_at)
       .select("id");
@@ -208,15 +208,15 @@ export async function sendDueForVault(
           sent_on: t.sent_on,
           updated_at: t.updated_at,
         })
-        .eq("vault_id", vaultId)
+        .eq("blueprint_id", blueprintId)
         .eq("id", t.id);
     };
 
     const { data: item, error: itemErr } = await admin
       .from("items")
       .insert({
-        vault_id: vaultId,
-        user_id: vault.owner_id,
+        blueprint_id: blueprintId,
+        user_id: blueprint.owner_id,
         box: "DROP",
         title: t.title,
         notes: fieldNoteNotes(t, opts.siteUrl, opts.today),
@@ -233,8 +233,8 @@ export async function sendDueForVault(
     }
 
     await admin.from("captures").insert({
-      vault_id: vaultId,
-      user_id: vault.owner_id,
+      blueprint_id: blueprintId,
+      user_id: blueprint.owner_id,
       raw: t.title,
       source: "future_tasks",
       item_id: item.id,
@@ -242,7 +242,7 @@ export async function sendDueForVault(
     await admin
       .from(TABLE)
       .update({ last_item_id: item.id })
-      .eq("vault_id", vaultId)
+      .eq("blueprint_id", blueprintId)
       .eq("id", t.id);
 
     sent.push(t);
@@ -278,18 +278,18 @@ export async function sendAllDue(
   const errors: string[] = [];
   const { data, error } = await admin
     .from(TABLE)
-    .select("vault_id")
+    .select("blueprint_id")
     .is("done_at", null)
     .lte("due_on", today);
   if (error) return { ok: false, sent: 0, errors: [error.message] };
 
-  const vaultIds = [
-    ...new Set(((data ?? []) as { vault_id: string }[]).map((r) => r.vault_id)),
+  const blueprintIds = [
+    ...new Set(((data ?? []) as { blueprint_id: string }[]).map((r) => r.blueprint_id)),
   ];
   let total = 0;
-  for (const vaultId of vaultIds) {
+  for (const blueprintId of blueprintIds) {
     try {
-      const sent = await sendDueForVault(admin, vaultId, {
+      const sent = await sendDueForBlueprint(admin, blueprintId, {
         today,
         siteUrl: opts.siteUrl,
       });
@@ -298,11 +298,11 @@ export async function sendAllDue(
         await notifySlack(sent, today, opts.siteUrl, opts.fetchImpl);
       } catch (e) {
         errors.push(
-          `${vaultId} slack: ${e instanceof Error ? e.message : String(e)}`,
+          `${blueprintId} slack: ${e instanceof Error ? e.message : String(e)}`,
         );
       }
     } catch (e) {
-      errors.push(`${vaultId}: ${e instanceof Error ? e.message : String(e)}`);
+      errors.push(`${blueprintId}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
   return { ok: errors.length === 0, sent: total, errors };

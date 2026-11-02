@@ -1,7 +1,7 @@
 import { supabaseServer } from "./supabase/server";
 
 export type BlueprintMembership = {
-  vaultId: string;
+  blueprintId: string;
   name: string;
   role: "owner" | "editor";
 };
@@ -9,26 +9,26 @@ export type BlueprintMembership = {
 export async function getCurrentBlueprintId(): Promise<string | null> {
   const sb = await supabaseServer();
   const { data } = await sb
-    .from("vault_members")
-    .select("vault_id")
+    .from("blueprint_members")
+    .select("blueprint_id")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return data?.vault_id ?? null;
+  return data?.blueprint_id ?? null;
 }
 
 export async function getMyBlueprints(): Promise<BlueprintMembership[]> {
   const sb = await supabaseServer();
   const { data, error } = await sb
-    .from("vault_members")
-    .select("role, vault:vaults(id, name)")
+    .from("blueprint_members")
+    .select("role, blueprint:blueprints(id, name)")
     .order("created_at", { ascending: false });
   if (error || !data) return [];
   return data
-    .filter((r: any) => r.vault)
+    .filter((r: any) => r.blueprint)
     .map((r: any) => ({
-      vaultId: r.vault.id,
-      name: r.vault.name,
+      blueprintId: r.blueprint.id,
+      name: r.blueprint.name,
       role: r.role,
     }));
 }

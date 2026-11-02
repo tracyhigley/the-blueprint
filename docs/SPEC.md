@@ -1,3 +1,5 @@
+> **Historical document.** Written when this app was called "The Vault". The app is now **The Blueprint**, and the vault terminology, routes, and some features described here no longer exist. See `AGENTS.md` for current names and structure.
+
 # The Vault — App Specification
 
 A web app that replaces Tracy's 14-tab Google Sheet + `plan_day.py` pipeline with a single coherent system. The vault metaphor is hers; this spec refines it, doesn't reinvent it.

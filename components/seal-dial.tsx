@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 
-// Big ceremonial vault dial. The seal/unseal transition is a 1.6-second
+// Big ceremonial seal dial. The seal/unseal transition is a 1.6-second
 // sequence the user is meant to watch:
 //
 //   t=0      pin starts sweeping (270° clockwise to seal, counter-clockwise to open)
@@ -47,7 +47,7 @@ const DIAL_DARK = {
   lockFill: "rgba(224,185,99,0.08)",
 } as const;
 
-export function VaultDial({
+export function SealDial({
   sealed,
   animate = false,
   size = 440,
@@ -97,7 +97,7 @@ export function VaultDial({
     <div
       className="relative select-none"
       style={{ width: size, height: size }}
-      aria-label={sealed ? "Vault sealed" : "Vault open"}
+      aria-label={sealed ? "Sealed" : "Open"}
     >
       <style>{`
         @keyframes dial-wobble {

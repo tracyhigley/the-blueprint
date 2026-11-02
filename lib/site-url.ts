@@ -3,12 +3,10 @@
 /** Previous Vercel deployment hostnames → redirect to the current app. */
 const LEGACY_PROJECT_HOSTS = new Set([
   "thevault-rachel-higleys-projects.vercel.app",
+  "the-vault-gray-five.vercel.app",
 ]);
 
-// TODO(blueprint-rename): still points at the old "the-vault" Vercel project.
-// Update once the Vercel project itself is renamed/moved to a Blueprint-branded
-// domain, and add the old host above to LEGACY_PROJECT_HOSTS so it redirects.
-const DEFAULT_CANONICAL_ORIGIN = "https://the-vault-gray-five.vercel.app";
+const DEFAULT_CANONICAL_ORIGIN = "https://tracy-blueprint.vercel.app";
 
 function normalizeOrigin(value: string): string {
   const trimmed = value.trim().replace(/\/$/, "");
@@ -18,13 +16,10 @@ function normalizeOrigin(value: string): string {
 
 /**
  * Runtime canonical URL (set BLUEPRINT_SITE_URL in Vercel — no rebuild
- * required). Falls back to the legacy VAULT_SITE_URL name so nothing breaks
- * if that's still what's set in the Vercel dashboard.
+ * required).
  */
 export function getCanonicalSiteUrl(): string | null {
-  const raw = (
-    process.env.BLUEPRINT_SITE_URL ?? process.env.VAULT_SITE_URL
-  )?.trim();
+  const raw = process.env.BLUEPRINT_SITE_URL?.trim();
   if (!raw) return null;
   return normalizeOrigin(raw);
 }
@@ -46,7 +41,7 @@ function hostFromHeaders(h: { get(name: string): string | null }): string | null
 }
 
 /**
- * OAuth and calendar setup use BLUEPRINT_SITE_URL (or legacy VAULT_SITE_URL)
+ * OAuth and calendar setup use BLUEPRINT_SITE_URL
  * when set, else the request host, else NEXT_PUBLIC_SITE_URL (may be stale
  * until the next build).
  */

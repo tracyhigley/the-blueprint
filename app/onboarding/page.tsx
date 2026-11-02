@@ -12,8 +12,8 @@ export default async function OnboardingPage() {
   if (!user) redirect("/login");
 
   const { data: membership } = await sb
-    .from("vault_members")
-    .select("vault_id")
+    .from("blueprint_members")
+    .select("blueprint_id")
     .limit(1)
     .maybeSingle();
 

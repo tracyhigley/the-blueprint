@@ -9,7 +9,7 @@ const Body = z.object({
 });
 
 /** Bearer matches `settings.capture_token` for a blueprint the user belongs to, or legacy `CAPTURE_TOKEN` env + user’s default blueprint. */
-async function resolveVaultId(
+async function resolveBlueprintId(
   bearerToken: string,
   userId: string,
 ): Promise<string | null> {
@@ -20,30 +20,30 @@ async function resolveVaultId(
 
   const { data: settingsHit } = await sb
     .from("settings")
-    .select("vault_id")
+    .select("blueprint_id")
     .eq("capture_token", trimmed)
     .maybeSingle();
 
-  if (settingsHit?.vault_id) {
+  if (settingsHit?.blueprint_id) {
     const { data: member } = await sb
-      .from("vault_members")
-      .select("vault_id")
-      .eq("vault_id", settingsHit.vault_id)
+      .from("blueprint_members")
+      .select("blueprint_id")
+      .eq("blueprint_id", settingsHit.blueprint_id)
       .eq("user_id", userId)
       .maybeSingle();
-    return member?.vault_id ?? null;
+    return member?.blueprint_id ?? null;
   }
 
   const envTok = process.env.CAPTURE_TOKEN?.trim();
   if (envTok && trimmed === envTok) {
     const { data: membership } = await sb
-      .from("vault_members")
-      .select("vault_id")
+      .from("blueprint_members")
+      .select("blueprint_id")
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
-    return membership?.vault_id ?? null;
+    return membership?.blueprint_id ?? null;
   }
 
   return null;
@@ -63,8 +63,8 @@ export async function POST(req: NextRequest) {
     return new Response("Bad request", { status: 400 });
   }
 
-  const vaultId = await resolveVaultId(bearerToken, parsed.userId);
-  if (!vaultId) {
+  const blueprintId = await resolveBlueprintId(bearerToken, parsed.userId);
+  if (!blueprintId) {
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   const { data: item, error } = await sb
     .from("items")
     .insert({
-      vault_id: vaultId,
+      blueprint_id: blueprintId,
       user_id: parsed.userId,
       box: "DROP",
       title: parsed.text.trim(),
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
   }
 
   await sb.from("captures").insert({
-    vault_id: vaultId,
+    blueprint_id: blueprintId,
     user_id: parsed.userId,
     raw: parsed.text,
     source: parsed.source,

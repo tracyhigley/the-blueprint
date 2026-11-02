@@ -29,15 +29,15 @@ async function requireUser() {
   return { sb, user };
 }
 
-async function currentVaultId() {
+async function currentBlueprintId() {
   const { sb } = await requireUser();
   const { data } = await sb
-    .from("vault_members")
-    .select("vault_id")
+    .from("blueprint_members")
+    .select("blueprint_id")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return data?.vault_id as string | undefined;
+  return data?.blueprint_id as string | undefined;
 }
 
 // ─── Buildings (settings.buildings) ─────────────────────────────────────────
@@ -56,15 +56,15 @@ export async function saveBuildingConfig(
   buildings: z.input<typeof BuildingConfig>[],
 ) {
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   let parsed;
   try {
     parsed = buildings.map((b) => BuildingConfig.parse(b));
   } catch (e) {
     throw new Error(describeZodError(e) ?? "Invalid building settings.");
   }
-  await sb.from("settings").upsert({ vault_id: vaultId, buildings: parsed });
+  await sb.from("settings").upsert({ blueprint_id: blueprintId, buildings: parsed });
   revalidatePath("/project-plans", "layout");
   revalidatePath("/settings/buildings");
 }
@@ -80,8 +80,8 @@ export async function saveBuildingConfig(
 export async function saveWeekBuildings(day: DayKey, buildingKeys: string[]) {
   if (!isDayKey(day)) throw new Error("Invalid day");
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const clean = Array.from(
     new Set(
       buildingKeys.filter((k) => typeof k === "string" && k.trim().length > 0),
@@ -90,7 +90,7 @@ export async function saveWeekBuildings(day: DayKey, buildingKeys: string[]) {
   const { data } = await sb
     .from("settings")
     .select("week_buildings, week_day_projects")
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .maybeSingle();
   const currentBuildings = (data?.week_buildings as WeekBuildings | null) ?? {};
   const nextBuildings: WeekBuildings = { ...currentBuildings, [day]: clean };
@@ -110,7 +110,7 @@ export async function saveWeekBuildings(day: DayKey, buildingKeys: string[]) {
   };
 
   const { error } = await sb.from("settings").upsert({
-    vault_id: vaultId,
+    blueprint_id: blueprintId,
     week_buildings: nextBuildings,
     week_day_projects: nextProjects,
   });
@@ -125,12 +125,12 @@ export async function saveWeekDayProject(
 ) {
   if (!isDayKey(day)) throw new Error("Invalid day");
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const { data } = await sb
     .from("settings")
     .select("week_day_projects")
-    .eq("vault_id", vaultId)
+    .eq("blueprint_id", blueprintId)
     .maybeSingle();
   const current = (data?.week_day_projects as WeekDayProjects | null) ?? {};
   const dayProjects = { ...(current[day] ?? {}) };
@@ -139,7 +139,7 @@ export async function saveWeekDayProject(
   const next: WeekDayProjects = { ...current, [day]: dayProjects };
   const { error } = await sb
     .from("settings")
-    .upsert({ vault_id: vaultId, week_day_projects: next });
+    .upsert({ blueprint_id: blueprintId, week_day_projects: next });
   if (error) throw new Error(error.message);
   revalidatePath("/this-week");
 }
@@ -150,8 +150,8 @@ export async function saveWeekDayProject(
 // sends its complete current selection.
 export async function saveWeekWritingProjects(projectIds: string[]) {
   const { sb } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const clean = Array.from(
     new Set(
       projectIds.filter((id) => typeof id === "string" && id.trim().length > 0),
@@ -159,7 +159,7 @@ export async function saveWeekWritingProjects(projectIds: string[]) {
   );
   const { error } = await sb
     .from("settings")
-    .upsert({ vault_id: vaultId, week_writing_projects: clean });
+    .upsert({ blueprint_id: blueprintId, week_writing_projects: clean });
   if (error) throw new Error(error.message);
   revalidatePath("/this-week");
 }
@@ -174,12 +174,12 @@ export async function createProject(
   phase: z.input<typeof Phase> = "idea",
 ) {
   const { sb, user } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const cleanTitle = title.trim();
   if (!cleanTitle) throw new Error("Give it a name first");
   const { error } = await sb.from("projects").insert({
-    vault_id: vaultId,
+    blueprint_id: blueprintId,
     user_id: user.id,
     building,
     title: cleanTitle,
@@ -198,14 +198,14 @@ export async function createProjectFromNote(
   sketch: string,
 ) {
   const { sb, user } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
   const cleanTitle = title.trim();
   if (!cleanTitle) throw new Error("Give it a name first");
   const { data, error } = await sb
     .from("projects")
     .insert({
-      vault_id: vaultId,
+      blueprint_id: blueprintId,
       user_id: user.id,
       building,
       title: cleanTitle,
@@ -589,8 +589,8 @@ export async function addProjectTaskToToday(
   minutes: number | null,
 ) {
   const { sb, user } = await requireUser();
-  const vaultId = await currentVaultId();
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
 
   const { data: existing, error: existingError } = await sb
     .from("items")
@@ -628,7 +628,7 @@ export async function addProjectTaskToToday(
     const urgent =
       normalizeTasks(proj?.tasks).find((t) => t.id === taskId)?.urgent ?? false;
     const { error } = await sb.from("items").insert({
-      vault_id: vaultId,
+      blueprint_id: blueprintId,
       user_id: user.id,
       box: "COUNTER",
       title: text,

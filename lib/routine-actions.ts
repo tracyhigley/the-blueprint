@@ -18,13 +18,13 @@ export async function saveRoutineDay(date: string, checked: string[]) {
   } = await sb.auth.getUser();
   if (!user) throw new Error("Not authenticated");
   const { data: member } = await sb
-    .from("vault_members")
-    .select("vault_id")
+    .from("blueprint_members")
+    .select("blueprint_id")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  const vaultId = member?.vault_id as string | undefined;
-  if (!vaultId) throw new Error("No vault");
+  const blueprintId = member?.blueprint_id as string | undefined;
+  if (!blueprintId) throw new Error("No blueprint");
 
   const clean = Array.from(new Set(checked.filter((k) => VALID_KEYS.has(k))));
 
@@ -32,18 +32,18 @@ export async function saveRoutineDay(date: string, checked: string[]) {
     const { error } = await sb
       .from("routine_days")
       .delete()
-      .eq("vault_id", vaultId)
+      .eq("blueprint_id", blueprintId)
       .eq("date", date);
     if (error) throw new Error(error.message);
   } else {
     const { error } = await sb.from("routine_days").upsert(
       {
-        vault_id: vaultId,
+        blueprint_id: blueprintId,
         date,
         checked: clean,
         modified_at: new Date().toISOString(),
       },
-      { onConflict: "vault_id,date" },
+      { onConflict: "blueprint_id,date" },
     );
     if (error) throw new Error(error.message);
   }

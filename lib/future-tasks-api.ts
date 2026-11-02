@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin, supabaseServer } from "@/lib/supabase/server";
 import { getSiteUrlFromEnv } from "@/lib/site-url";
 import { futureTasksToday } from "@/lib/future-tasks";
-import { notifySlack, sendDueForVault, TaskGone } from "@/lib/future-tasks-db";
+import { notifySlack, sendDueForBlueprint, TaskGone } from "@/lib/future-tasks-db";
 
 export class BadInput extends Error {}
 
@@ -16,15 +16,15 @@ export async function requireCtx() {
   } = await sb.auth.getUser();
   if (!user) throw new BadInput("sign in first");
   const { data } = await sb
-    .from("vault_members")
-    .select("vault_id")
+    .from("blueprint_members")
+    .select("blueprint_id")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (!data?.vault_id)
+  if (!data?.blueprint_id)
     throw new BadInput("no blueprint found for this account");
-  return { sb, userId: user.id as string, vaultId: data.vault_id as string };
+  return { sb, userId: user.id as string, blueprintId: data.blueprint_id as string };
 }
 
 export async function readJson(req: Request): Promise<Record<string, unknown>> {
@@ -58,12 +58,12 @@ export function errorReply(e: unknown) {
  * straight to Field Notes instead of waiting for tomorrow morning's job.
  * Failures here never undo the save; the morning job will pick it up.
  */
-export async function sendNowIfDue(vaultId: string): Promise<number> {
+export async function sendNowIfDue(blueprintId: string): Promise<number> {
   try {
     const admin = supabaseAdmin();
     const today = futureTasksToday();
     const siteUrl = getSiteUrlFromEnv();
-    const sent = await sendDueForVault(admin, vaultId, { today, siteUrl });
+    const sent = await sendDueForBlueprint(admin, blueprintId, { today, siteUrl });
     if (sent.length) {
       try {
         await notifySlack(sent, today, siteUrl);
