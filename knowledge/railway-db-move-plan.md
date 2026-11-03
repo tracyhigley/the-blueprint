@@ -55,7 +55,7 @@ Simpler email choices if you don't want a new email service for 2 people: (a) pa
 6. Tests: run the existing `npm test`, add tests for the query layer and for "a non-member sees nothing".
 7. Environment variables change at cut-over only (listed in section 7 — I'll ask before touching any).
 
-Everything stays on branch `try/railway-db`; `main` and the live site are not affected until you say "ship it".
+The plan sits on branch `plan/railway-db-move`; the code work would go on `try/railway-db`; `main` and the live site are not affected until you say "ship it".
 
 ## 5. Rehearsal first (no effect on the live site)
 
@@ -71,7 +71,7 @@ Everything stays on branch `try/railway-db`; `main` and the live site are not af
 
 Taken 2026-11-03, read-only, from the live Supabase using the app's own admin access. Saved in **`~/Documents/Blueprint-backups/supabase-2026-11-03/`** — outside the repo, folder locked to your user only.
 
-- One JSON file per table (14), the list of 2 users (emails and ids — **not** passwords), plus a copy of all 26 migrations and `row-counts.json`.
+- One JSON file per table (14), the list of 2 users (emails and ids — **not** passwords), plus a copy of all the migration files and `row-counts.json`.
 - Row counts matched live Supabase exactly: items 1,020 · captures 785 · day_inputs 96 · projects 68 · future_tasks 60 · routine_days 6 · calendar_week_assignments 27 · calendar_day_overrides 244 · calendar_drop_imports 122 · settings 1 · blueprints 1 · blueprint_members 2 · google_calendar_connections 1 · google_calendar_secrets 1 · users 2.
 - **This folder holds your Google Calendar token and your capture token. Treat it like a password: don't put it in git, email or a shared drive.**
 - Passwords cannot be exported this way (Supabase keeps only a scrambled version in a place I can't read without the database password). So: **both users set a new password at first sign-in** after the move. That avoids needing the database password at all.
