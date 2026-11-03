@@ -10,12 +10,12 @@ cp .env.local.example .env.local        # then fill it in
 npm run dev                              # http://localhost:3000
 ```
 
-Until Supabase env vars are set, pages render in empty-state mode (no items).
+Without `DATABASE_URL` and `SESSION_SECRET` set, sign-in and the data pages will not work.
 
 ## Stack
 
 - Next.js 16 (App Router, Turbopack) · React 19 · Tailwind 4
-- Supabase (Postgres + Auth + RLS)
+- Postgres on Railway (row-level security kept) with our own sign-in (signed cookie, `lib/auth/`)
 - Vercel
 - Apple Shortcut + bookmarklet for capture
 
@@ -34,18 +34,21 @@ lib/
   data.ts           Read-side helpers
   categories.ts     Boxes / Documents / Energies (configured per-blueprint)
   shortcuts.tsx     Keyboard shortcut hook + cheat sheet
-  supabase/         Server + client helpers
+  db/               Postgres client (Supabase-shaped calls) + SQL builder
+  auth/             Signed sign-in cookie
+  supabase/server.ts  Keeps the old names (supabaseServer / supabaseAdmin) over lib/db
   types.ts          Domain types
 scripts/
   apple-shortcut.md       Action Button setup recipe
 supabase/migrations/      SQL schema (run in order)
+supabase/railway/         Railway-only setup (stand-in auth schema before, app_user role after)
 docs/SPEC.md              Original app spec (historical)
 ```
 
 ## Going live
 
-1. **Supabase** — create a project, run every migration in `supabase/migrations/` in order, drop the URL / anon key / service-role key into `.env.local`.
-2. **Sign in once** at the deployed URL to seed the `auth.users` row, grab the uid.
+1. **Database** — create a Postgres on Railway, then `DATABASE_URL=… node scripts/railway-setup.mjs <backup-folder>` builds it (stand-in schema, every migration, app_user role) and loads a backup. Put `DATABASE_URL` and a 32+ character `SESSION_SECRET` in `.env.local` / Vercel.
+2. **Create a login** — `DATABASE_URL=… node scripts/set-password.mjs you@example.com` (asks for the password, hidden). There is no sign-up page.
 3. **Review settings** — `/settings/boxes`, `/settings/documents`, `/settings/energies` — rename labels as needed.
 4. **Configure the day** — `/settings` for default hours / end-of-day.
 5. **Connect devices** — `/settings/connect` walks through iPhone Siri, Mac dock, and the bookmarklet.

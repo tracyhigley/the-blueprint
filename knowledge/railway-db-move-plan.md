@@ -186,4 +186,4 @@ What's on the branch:
 - Tracy signed in and confirmed the live site looks good. Rachel's login is intentionally left without a password. (Tracy, 2026-11-03)
 - iPhone shortcut address: `https://tracy-blueprint.vercel.app/api/capture`, unchanged; bearer token and user id unchanged.
 - Supabase project `xdmcvnbiupvvnqphjrxo` is untouched and not paused. Pausing or deleting waits for Tracy.
-- Loose ends: old Supabase and unscoped preview settings in Vercel are unused; Vercel preview settings `DATABASE_URL`/`SESSION_SECRET` still point at the same Railway database; the Railway project is named `the-blueprint-rehearsal`.
+- Loose ends: old Supabase and unscoped preview settings in Vercel are unused; Vercel preview settings `DATABASE_URL`/`SESSION_SECRET` still point at the same Railway database; the Railway project was renamed `the-blueprint` (Tracy, 2026-11-03).

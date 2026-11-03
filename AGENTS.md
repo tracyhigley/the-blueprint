@@ -68,7 +68,7 @@ If a step requires technical knowledge, **you do it**. If something is genuinely
 
 ## Repo conventions
 
-- **Stack:** Next.js 16 (App Router, Turbopack) · React 19 · TypeScript strict · Tailwind 4 · Supabase · Vercel.
+- **Stack:** Next.js 16 (App Router, Turbopack) · React 19 · TypeScript strict · Tailwind 4 · Postgres on Railway · Vercel. (Moved off Supabase on 2026-11-03; the old project is kept paused-not-deleted until Tracy says. Sign-in is our own signed cookie, not Supabase Auth.)
 - **Files match URLs.** `app/drop/page.tsx` is `/drop`. Don't create routing config.
 - **One file per concept.** A `TodayToggle` component lives in `components/today-toggle.tsx`. Don't bundle.
 - **Server Actions** for mutations (in `lib/actions.ts`). Co-locate where it makes sense.
@@ -109,6 +109,8 @@ lib/
 scripts/
   apple-shortcut.md       Action Button setup recipe
 supabase/migrations/      SQL schema (run in order)
+supabase/railway/         Railway-only setup SQL (before / after the migrations)
+lib/db/ lib/auth/         Postgres client + sign-in cookie (lib/supabase/server.ts keeps the old names)
 docs/
   SPEC.md                 Original app spec (historical)
 ```
@@ -208,8 +210,8 @@ Changing this logic requires a deliberate, named change. Don't tweak for cosmeti
 
 ### Going live (first time)
 
-1. Create Supabase project; run every migration in `supabase/migrations/` in order.
-2. User signs in once at the deployed URL — captures their `auth.uid`.
+1. Create a Railway Postgres; `node scripts/railway-setup.mjs <backup-folder>` runs the setup SQL and every migration in order.
+2. Create their login with `node scripts/set-password.mjs <email>` (password typed hidden; no sign-up page, no email links).
 3. They review **Settings → Boxes / Documents / Energies**, rename labels.
 4. They set **Settings → General** (default hours, end of day).
 5. They walk through **Settings → Connect** to wire iPhone Siri / Mac dock / bookmarklet.
@@ -323,7 +325,7 @@ Every `useShortcut` call with a `label` auto-registers in the cheat sheet (`?` k
 
 - **"Failed to fetch RSC payload" + bare `undefined` rejections in dev** — almost always a stale client bundle after dev-server restart. The guard silences these. If they persist after the user hard-refreshes (⌘⇧R), then it's real.
 - **Dev server returning 500 after a clean restart** — clear `.next/` (`rm -rf .next`) and restart. Turbopack's incremental cache can desync after backslash-deep edits.
-- **A change works locally but not in deployed Vercel build** — usually a missing migration the user hasn't run in their Supabase project. Check `supabase/migrations/` for any new files vs. what's been run.
+- **A change works locally but not in deployed Vercel build** — usually a missing migration the user hasn't run in the Railway database. Check `supabase/migrations/` for any new files vs. what's been run, and run them against `DATABASE_URL` yourself — never ask the user to.
 - **iOS Safari standalone detection** — uses both `window.matchMedia('(display-mode: standalone)').matches` AND iOS-specific `(navigator as any).standalone`. The `connect-device-cards.tsx` component does both.
 - **Captures vs items** — the `captures` table holds raw capture history; `items` are the actual rows. `captures.item_id` is `on delete set null`, so wiping items leaves capture history intact (this is intentional for audit).
 - **`getAllItems()` returns everything, not just storage** — when displaying a count, filter out counter-station boxes (`DROP`, `ATM`, `COUNTER`, `DOCKET`) unless you specifically mean "every row."
