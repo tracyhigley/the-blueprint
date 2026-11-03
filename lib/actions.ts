@@ -1255,22 +1255,16 @@ export async function inviteMember(formData: FormData) {
   const parsed = InviteSchema.parse(Object.fromEntries(formData));
   const admin = supabaseAdmin();
 
-  const { data: list } = await admin.auth.admin.listUsers();
-  const existing = list?.users.find(
-    (u: any) => u.email?.toLowerCase() === parsed.email.toLowerCase(),
-  );
-
-  let invitedUserId: string | null = existing?.id ?? null;
-  if (!invitedUserId) {
-    const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(
-      parsed.email,
-      {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3002"}/auth/callback`,
-      },
-    );
-    if (error) throw error;
-    invitedUserId = invited.user.id;
-  }
+  // No invite emails any more: the person needs a login first (ask Claude to
+  // create one with scripts/set-password.mjs), then this adds them.
+  const { data: existing } = await admin
+    .from("users_login")
+    .select("id")
+    .eq("email", parsed.email.toLowerCase())
+    .maybeSingle();
+  if (!existing?.id)
+    throw new Error("That person doesn't have a login yet — ask Claude to create one first.");
+  const invitedUserId: string = existing.id;
 
   await admin.from("blueprint_members").upsert({
     blueprint_id: blueprintId,

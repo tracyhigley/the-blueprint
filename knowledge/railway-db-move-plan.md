@@ -138,3 +138,15 @@ Sources for the price ranges are third-party summaries — I'd confirm on railwa
 - All migrations 0001–0026 ran cleanly on a plain Railway Postgres (with a stand-in `auth` schema and `auth.uid()`), and the backup loaded with **every table's row count matching** Supabase (14/14).
 - A temporary public database address was opened only for the load and then removed. The rehearsal copy holds real data (including the Google Calendar token): delete the project when the rehearsal is finished.
 - Not yet done: fingerprint check, the code branch, the click-through, and the hub-route test.
+
+## 14. Code branch `try/railway-db` (built, not live)
+
+Decisions (Tracy, 2026-11-03): no email service — passwords are set by Claude with `scripts/set-password.mjs`, no magic link, no forgot-password email, no self sign-up, invites need a login created first. Add libraries `pg` and `bcryptjs`.
+
+What's on the branch:
+- `lib/db/` — Supabase-shaped query layer over Postgres (`sql.ts` builds the SQL, `client.ts` runs it). User queries run as the limited `app_user` role with the signed-in person's id, so the existing row-level rules still apply.
+- `lib/auth/session.ts` — signed cookie sign-in; `/api/auth/login` checks the password. Needs two new settings at cut-over: `DATABASE_URL` and `SESSION_SECRET` (32+ characters).
+- `lib/supabase/server.ts` keeps its old names but now returns the new client, so ~170 call sites are unchanged. Hub, capture, cron and future-task routes are unchanged and still use the owner client.
+- `supabase/railway/00_base.sql` and `99_app_user.sql`, plus `scripts/railway-setup.mjs` (builds a database from scratch, loads a backup, checks all 14 row counts + users) and `scripts/set-password.mjs`.
+- Tested against the rehearsal copy: a member sees their rows, a stranger and a signed-out visitor see none and can't write; joins, dates and numbers come back in the same shape; the hub's create/update/close/list work. 89 tests pass. Type check clean.
+- Still to do: click-through of the real screens with your account, a Vercel preview, and the maintenance-page step.

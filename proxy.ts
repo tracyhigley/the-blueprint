@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import { readSession, SESSION_COOKIE } from "@/lib/auth/session";
+import { supabaseAdmin } from "@/lib/supabase/server";
 import {
   getDefaultCanonicalSiteUrl,
   isLegacyProjectHost,
@@ -7,8 +8,7 @@ import {
 
 const PUBLIC_PATHS = [
   "/login",
-  "/auth/callback",
-  "/auth/reset",
+  "/api/auth/login",
   "/api/capture",
   "/api/hub-todos", // its own bearer token, checked in the routes
   "/api/cron/calendar-to-drop",
@@ -25,33 +25,10 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(target, 308);
   }
 
-  let res = NextResponse.next({ request: req });
+  const res = NextResponse.next({ request: req });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const key =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  if (!url || !key) {
-    return res; // env not set yet — let pages render their empty states
-  }
-
-  const supabase = createServerClient(url, key, {
-    cookies: {
-      getAll: () => req.cookies.getAll(),
-      setAll: (toSet) => {
-        toSet.forEach(({ name, value }) => req.cookies.set(name, value));
-        res = NextResponse.next({ request: req });
-        toSet.forEach(({ name, value, options }) =>
-          res.cookies.set(name, value, options),
-        );
-      },
-    },
-  });
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const session = readSession(req.cookies.get(SESSION_COOKIE)?.value);
+  const user = session ? { id: session.uid } : null;
 
   const path = req.nextUrl.pathname;
   const isPublic = PUBLIC_PATHS.some(
@@ -67,10 +44,10 @@ export async function proxy(req: NextRequest) {
 
   // Authed but not yet a member of any blueprint → onboarding.
   if (user && !isPublic && path !== "/onboarding") {
-    const { data: membership } = await supabase
+    const { data: membership } = await supabaseAdmin()
       .from("blueprint_members")
       .select("blueprint_id")
-      .order("created_at", { ascending: false })
+      .eq("user_id", user.id)
       .limit(1)
       .maybeSingle();
     if (!membership) {

@@ -43,7 +43,7 @@ export async function getRoutineRange(
       date: String(r.date),
       checked: Array.isArray(r.checked) ? (r.checked as string[]) : [],
     }))
-    .filter((r) => r.checked.length > 0);
+    .filter((r: { checked: string[] }) => r.checked.length > 0);
 }
 
 /** The earliest day with anything logged, or null if nothing ever was. */
