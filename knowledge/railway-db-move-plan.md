@@ -171,3 +171,9 @@ What's on the branch:
 - Correction to section 16: the rehearsal database's disk is already in Railway's **Ashburn, Virginia** data center — the same area as Vercel's functions (`iad1`). So distance is not the cause I guessed. My own internet to the database measures 0.2–0.5 s per round trip, which explains the slow numbers I saw from my laptop; I can't tell the true Vercel-to-database time from here.
 - Cut database round trips per signed-in query from three to two (the "clean up" step now runs in the background and the connection is thrown away if it fails). All 89 tests pass, including the "stranger sees nothing" checks.
 - Still to do: re-time the preview once its database setting points at the current temporary address; then decide whether the Railway project's own address (private, no internet hop) would need the app itself to move to Railway — not part of this plan.
+
+## 18. Preview re-timing (2026-11-03)
+
+- Measured from my laptop against the Vercel preview, after the two-trip change. The sign-in page, which uses **no database at all**, took 2.4–4.5 s; pages that read the database took 1.2–5.4 s (Field Notes, Maint Tasks, This Week, Settings). The database pages were not slower than the no-database page, so my slow internet and the preview's protection layer account for the time, not the database.
+- Conclusion: no evidence the move makes pages slower. This can't be proven from here; the real test is how your live site feels on the first day, and the undo step (section 10) covers it. A cleaner number is available at cut-over: time the same pages on the live address before and after.
+- Rehearsal database's temporary public address closed again.
