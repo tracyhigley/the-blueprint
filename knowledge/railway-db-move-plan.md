@@ -150,3 +150,11 @@ What's on the branch:
 - `supabase/railway/00_base.sql` and `99_app_user.sql`, plus `scripts/railway-setup.mjs` (builds a database from scratch, loads a backup, checks all 14 row counts + users) and `scripts/set-password.mjs`.
 - Tested against the rehearsal copy: a member sees their rows, a stranger and a signed-out visitor see none and can't write; joins, dates and numbers come back in the same shape; the hub's create/update/close/list work. 89 tests pass. Type check clean.
 - Still to do: click-through of the real screens with your account, a Vercel preview, and the maintenance-page step.
+
+## 15. Click-through result (2026-11-03, local app on the rehearsal copy)
+
+- Signed in with a throwaway password on the copy; wrong password refused. Signed-out visitors go to `/login`.
+- 17 main pages opened with your real data and no errors (Field Notes, Maint Tasks, Future Tasks, Project Plans, Project Tasks, This Week, Routine, Sealed, Settings pages, Documents, Build). Adding a Field Note saved to the right blueprint and owner.
+- Hub routes over HTTP: no token → 401; create → `created`; same key → `updated`; dated one lands in Future Tasks; list; close; list again — all as expected. Capture without a token → 401.
+- **Speed is the thing to watch.** From my laptop, pages took 2.5–4 s because each database round trip was about 1.6 s over the internet. Vercel and Railway are in data centers, so it should be far quicker, but it must be measured on a Vercel preview before cut-over. Two fixes if slow: put the new database in Railway's US-East region (Supabase was US-East-2) and/or pin the Vercel functions to the same area. Choosing the Railway region matters, so do it when the real database is created.
+- The rehearsal copy's temporary public address is closed, the local app is stopped, and the throwaway password lives only in that copy.
