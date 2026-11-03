@@ -177,3 +177,13 @@ What's on the branch:
 - Measured from my laptop against the Vercel preview, after the two-trip change. The sign-in page, which uses **no database at all**, took 2.4–4.5 s; pages that read the database took 1.2–5.4 s (Field Notes, Maint Tasks, This Week, Settings). The database pages were not slower than the no-database page, so my slow internet and the preview's protection layer account for the time, not the database.
 - Conclusion: no evidence the move makes pages slower. This can't be proven from here; the real test is how your live site feels on the first day, and the undo step (section 10) covers it. A cleaner number is available at cut-over: time the same pages on the live address before and after.
 - Rehearsal database's temporary public address closed again.
+
+## 19. Cut-over done (2026-11-03)
+
+- 1:50 PM Eastern: final read-only backup of Supabase (kept in `~/Documents/Blueprint-backups/supabase-2026-11-03-final/`). Copied into Railway Postgres in under a minute; all 14 tables and both users matched row for row.
+- 1:55 PM Eastern: branch merged into `main`; Vercel deployed to Production with `DATABASE_URL` and `SESSION_SECRET` (Production settings Tracy added). (Tracy, 2026-11-03: "Go".)
+- Nothing was written to Supabase after the final backup, so nothing needed copying back.
+- Tracy signed in and confirmed the live site looks good. Rachel's login is intentionally left without a password. (Tracy, 2026-11-03)
+- iPhone shortcut address: `https://tracy-blueprint.vercel.app/api/capture`, unchanged; bearer token and user id unchanged.
+- Supabase project `xdmcvnbiupvvnqphjrxo` is untouched and not paused. Pausing or deleting waits for Tracy.
+- Loose ends: old Supabase and unscoped preview settings in Vercel are unused; Vercel preview settings `DATABASE_URL`/`SESSION_SECRET` still point at the same Railway database; the Railway project is named `the-blueprint-rehearsal`.
