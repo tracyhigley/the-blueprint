@@ -131,3 +131,10 @@ Sources for the price ranges are third-party summaries — I'd confirm on railwa
 ## 12. Decisions recorded
 
 - 2026-11-03: Plan only; no production action until Tracy says yes in chat. (Tracy, 2026-11-03)
+
+## 13. Rehearsal log
+
+- 2026-11-03: Tracy said yes to one rehearsal Postgres service. Created Railway project `the-blueprint-rehearsal` (separate from the hub's project) with one Postgres service. (Tracy, 2026-11-03)
+- All migrations 0001–0026 ran cleanly on a plain Railway Postgres (with a stand-in `auth` schema and `auth.uid()`), and the backup loaded with **every table's row count matching** Supabase (14/14).
+- A temporary public database address was opened only for the load and then removed. The rehearsal copy holds real data (including the Google Calendar token): delete the project when the rehearsal is finished.
+- Not yet done: fingerprint check, the code branch, the click-through, and the hub-route test.
