@@ -158,3 +158,10 @@ What's on the branch:
 - Hub routes over HTTP: no token → 401; create → `created`; same key → `updated`; dated one lands in Future Tasks; list; close; list again — all as expected. Capture without a token → 401.
 - **Speed is the thing to watch.** From my laptop, pages took 2.5–4 s because each database round trip was about 1.6 s over the internet. Vercel and Railway are in data centers, so it should be far quicker, but it must be measured on a Vercel preview before cut-over. Two fixes if slow: put the new database in Railway's US-East region (Supabase was US-East-2) and/or pin the Vercel functions to the same area. Choosing the Railway region matters, so do it when the real database is created.
 - The rehearsal copy's temporary public address is closed, the local app is stopped, and the throwaway password lives only in that copy.
+
+## 16. Vercel preview result (2026-11-03)
+
+- Preview of `try/railway-db` built on Vercel (Virginia, `iad1`) with two preview-only, branch-only settings (`DATABASE_URL` pointing at the rehearsal copy, `SESSION_SECRET`). Live site's settings were not touched. (Tracy, 2026-11-03)
+- Sign-in works; Field Notes, Maint Tasks, Future Tasks, Project Plans, This Week, Routine, Settings and Build all open with the real data. Wrong password refused.
+- Speed from my laptop through the preview: most pages 1.4–2.5 s on a first try, 4–5 s on a second try, Build 5.5 s. The rehearsal database was created in Railway's default region (not US East), so Vercel (Virginia) is talking across the country, and every database call costs three trips. That is the likely cause.
+- Before cut-over: create the real database in a Railway **US East** region, rerun this timing, and if pages are still slow cut the trips per query (batching the setup step into the query). Target: pages within about a second of today's.
