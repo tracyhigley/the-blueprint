@@ -165,3 +165,9 @@ What's on the branch:
 - Sign-in works; Field Notes, Maint Tasks, Future Tasks, Project Plans, This Week, Routine, Settings and Build all open with the real data. Wrong password refused.
 - Speed from my laptop through the preview: most pages 1.4–2.5 s on a first try, 4–5 s on a second try, Build 5.5 s. The rehearsal database was created in Railway's default region (not US East), so Vercel (Virginia) is talking across the country, and every database call costs three trips. That is the likely cause.
 - Before cut-over: create the real database in a Railway **US East** region, rerun this timing, and if pages are still slow cut the trips per query (batching the setup step into the query). Target: pages within about a second of today's.
+
+## 17. Region check and speed-up (2026-11-03)
+
+- Correction to section 16: the rehearsal database's disk is already in Railway's **Ashburn, Virginia** data center — the same area as Vercel's functions (`iad1`). So distance is not the cause I guessed. My own internet to the database measures 0.2–0.5 s per round trip, which explains the slow numbers I saw from my laptop; I can't tell the true Vercel-to-database time from here.
+- Cut database round trips per signed-in query from three to two (the "clean up" step now runs in the background and the connection is thrown away if it fails). All 89 tests pass, including the "stranger sees nothing" checks.
+- Still to do: re-time the preview once its database setting points at the current temporary address; then decide whether the Railway project's own address (private, no internet hop) would need the app itself to move to Railway — not part of this plan.

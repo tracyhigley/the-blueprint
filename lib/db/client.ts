@@ -72,22 +72,32 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function run(who: Who, text: string, params: unknown[]) {
   const c = await pool().connect();
-  try {
-    if (who.kind === "admin") return await c.query(text, params);
-    // One round trip to open the transaction, become app_user and say who is asking.
-    const uid = who.userId ?? "";
-    if (uid && !UUID.test(uid)) throw new Error("bad user id");
-    await c.query(`begin; set local role app_user; select set_config('app.user_id', '${uid}', true)`);
+  if (who.kind === "admin") {
     try {
-      const r = await c.query(text, params);
-      await c.query("commit");
-      return r;
-    } catch (e) {
-      await c.query("rollback").catch(() => {});
-      throw e;
+      return await c.query(text, params);
+    } finally {
+      c.release();
     }
-  } finally {
+  }
+  // One trip to become app_user and say who is asking, one for the query.
+  // Each statement is its own transaction, so nothing needs a commit trip.
+  // Putting the connection back as it was runs in the background; if that
+  // fails the connection is thrown away so no one else ever inherits it.
+  const uid = who.userId ?? "";
+  if (uid && !UUID.test(uid)) {
     c.release();
+    throw new Error("bad user id");
+  }
+  let reset: Promise<unknown> | null = null;
+  try {
+    await c.query(`set role app_user; select set_config('app.user_id', '${uid}', false)`);
+    return await c.query(text, params);
+  } finally {
+    reset = c.query("reset role; reset app.user_id");
+    reset.then(
+      () => c.release(),
+      (e) => c.release(e instanceof Error ? e : new Error("reset failed")),
+    );
   }
 }
 
