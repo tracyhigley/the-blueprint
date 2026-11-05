@@ -37,7 +37,7 @@ d("against a rehearsal copy", () => {
     const day = (await sb.from("day_inputs").select("date, hours_available, created_at").limit(1).maybeSingle()).data;
     expect(day.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(typeof day.hours_available).toBe("number");
-    expect(day.created_at).toMatch(/Z$/);
+    expect(day.created_at).toMatch(/^\d{4}-\d{2}-\d{2}T[\d:.]+([+-]\d{2}:\d{2}|Z)$/);
   });
 
   it("writes: jsonb arrays, upsert, update with returning, soft delete — and a stranger can't write", async () => {
@@ -75,5 +75,25 @@ d("against a rehearsal copy", () => {
     await closeHubTodo(admin, member.blueprint_id, { source: "rehearsal", key: "t:1" });
     expect(await listHubTodos(admin, member.blueprint_id, "rehearsal")).toEqual([]);
     await admin.from("items").delete().eq("source", "rehearsal");
+  });
+
+  it("the morning job can claim a due Future Task (timestamps match to the microsecond)", async () => {
+    const { admin, member } = await ids();
+    const { sendDueForBlueprint } = await import("../future-tasks-db");
+    const { data: t } = await admin
+      .from("future_tasks")
+      .insert({ blueprint_id: member.blueprint_id, title: "rehearsal due task", due_on: "2026-01-01", repeat: "none" })
+      .select("id")
+      .single();
+    try {
+      const sent = await sendDueForBlueprint(admin, member.blueprint_id, { today: "2026-11-05", siteUrl: "https://x.test" });
+      expect(sent.map((x: { title: string }) => x.title)).toContain("rehearsal due task");
+      const { data: item } = await admin.from("items").select("id").eq("title", "rehearsal due task").maybeSingle();
+      expect(item?.id).toBeTruthy();
+    } finally {
+      await admin.from("items").delete().eq("title", "rehearsal due task");
+      await admin.from("captures").delete().eq("raw", "rehearsal due task");
+      await admin.from("future_tasks").delete().eq("id", t.id);
+    }
   });
 });

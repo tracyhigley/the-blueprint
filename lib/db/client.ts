@@ -14,12 +14,23 @@ type Result = { data: any; error: { message: string } | null }; // eslint-disabl
 
 const g = globalThis as unknown as { __bpPool?: Pool; __bpMeta?: Promise<Meta> };
 
+/**
+ * Postgres sends "2026-11-05 07:50:40.684177+01". Keep every digit (microseconds):
+ * a few queries match on a timestamp they read earlier (the Future Tasks "claim"
+ * uses updated_at), and rounding to milliseconds makes them miss.
+ */
+export function timestamptzToIso(v: string): string {
+  const m = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)([+-]\d{2})(?::?(\d{2}))?$/.exec(v);
+  if (!m) return new Date(v).toISOString();
+  return `${m[1]}T${m[2]}${m[3]}:${m[4] ?? "00"}`;
+}
+
 function typeParser(oid: number, format?: unknown) {
-  // numeric / bigint as numbers, timestamptz as ISO strings, date as plain "YYYY-MM-DD"
+  // numeric / bigint as numbers, timestamptz as ISO strings (full precision), date as plain "YYYY-MM-DD"
   // (what the app received from Supabase's JSON replies).
   if (oid === 1700 || oid === 701 || oid === 700) return (v: string) => parseFloat(v);
   if (oid === 20) return (v: string) => parseInt(v, 10);
-  if (oid === 1184) return (v: string) => new Date(v).toISOString();
+  if (oid === 1184) return timestamptzToIso;
   if (oid === 1082) return (v: string) => v;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return pgTypes.getTypeParser(oid, format as any);
