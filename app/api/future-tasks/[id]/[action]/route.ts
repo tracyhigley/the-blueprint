@@ -3,6 +3,7 @@ import { validateTask } from "@/lib/future-tasks";
 import { deleteTask, editTask, markDone, putBack } from "@/lib/future-tasks-db";
 import {
   BadInput,
+  checkBuilding,
   errorReply,
   ok,
   readJson,
@@ -31,6 +32,7 @@ export async function POST(
       case "edit": {
         const v = validateTask(await readJson(req));
         if (!v.ok) throw new BadInput(v.error);
+        await checkBuilding(sb, blueprintId, v.value.building);
         await editTask(sb, blueprintId, id, v.value);
         extra.sent_to_field_notes = (await sendNowIfDue(blueprintId)) > 0;
         break;

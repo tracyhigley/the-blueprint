@@ -14,10 +14,9 @@ import {
   NOTES_MAX,
   type FutureTask,
   type PageGroups,
-  isExternalLink,
   isoToEasternYmd,
-  metaLine,
   prettyDate,
+  whenLine,
 } from "@/lib/future-tasks";
 
 type FormState = {
@@ -26,6 +25,7 @@ type FormState = {
   repeat: string;
   link: string;
   notes: string;
+  building: string;
 };
 
 const EMPTY: FormState = {
@@ -34,6 +34,7 @@ const EMPTY: FormState = {
   repeat: "none",
   link: "",
   notes: "",
+  building: "",
 };
 
 const inputCls =
@@ -67,9 +68,11 @@ async function post(
 export function FutureTasksBoard({
   groups,
   today,
+  buildings = [],
 }: {
   groups: PageGroups;
   today: string;
+  buildings?: { key: string; label: string }[];
 }) {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -118,6 +121,7 @@ export function FutureTasksBoard({
       repeat: t.repeat,
       link: t.link ?? "",
       notes: t.notes ?? "",
+      building: t.building ?? "",
     });
     setStatus(null);
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -130,10 +134,7 @@ export function FutureTasksBoard({
   }
 
   const total =
-    groups.waiting.length +
-    groups.coming.length +
-    groups.someday.length +
-    groups.sent.length;
+    groups.upcoming.length + groups.recurring.length + groups.done.length;
 
   return (
     <>
@@ -184,6 +185,25 @@ export function FutureTasksBoard({
               ))}
             </select>
           </label>
+          {buildings.length > 0 && (
+            <label className="flex flex-col gap-1 md:col-span-2">
+              <span className={labelCls}>Building</span>
+              <select
+                className={inputCls}
+                value={form.building}
+                onChange={set("building")}
+              >
+                <option value="" className="bg-paper-bg">
+                  No building
+                </option>
+                {buildings.map((b) => (
+                  <option key={b.key} value={b.key} className="bg-paper-bg">
+                    {b.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="flex flex-col gap-1 md:col-span-2">
             <span className={labelCls}>Link</span>
             <input
@@ -240,27 +260,18 @@ export function FutureTasksBoard({
       ) : (
         <div className="mt-8 flex flex-col gap-6">
           <TaskCard
-            title="Going to Field Notes"
-            hint="Due today or earlier — on its way to Field Notes."
-            tasks={groups.waiting}
+            title="Upcoming"
+            hint="Each one goes into Field Notes on its day, with a Slack alert. No date = someday."
+            tasks={groups.upcoming}
             today={today}
             busy={busy}
             onEdit={startEdit}
             run={run}
           />
           <TaskCard
-            title="Coming up"
-            hint="Each one goes into Field Notes on its day, with a Slack alert."
-            tasks={groups.coming}
-            today={today}
-            busy={busy}
-            onEdit={startEdit}
-            run={run}
-          />
-          <TaskCard
-            title="Someday"
-            hint="Edit one to give it a day."
-            tasks={groups.someday}
+            title="Recurring"
+            hint="Each one goes into Field Notes on its day, then moves to its next date."
+            tasks={groups.recurring}
             today={today}
             busy={busy}
             onEdit={startEdit}
@@ -268,8 +279,8 @@ export function FutureTasksBoard({
           />
           <TaskCard
             title="Done"
-            hint={`Sent to Field Notes or marked done in the last 30 days.`}
-            tasks={groups.sent}
+            hint="Sent to Field Notes or marked done. Deleted for good after 10 days."
+            tasks={groups.done}
             today={today}
             busy={busy}
             onEdit={startEdit}
@@ -344,7 +355,7 @@ function TaskRow({
   const [armed, setArmed] = useState(false);
   const meta = done
     ? `${t.sent_on ? "Sent to Field Notes" : "Marked done"} ${prettyDate(isoToEasternYmd(t.done_at!))}`
-    : metaLine(t, today);
+    : whenLine(t, today);
 
   return (
     <li className="flex flex-col gap-2 py-3 md:flex-row md:items-start md:justify-between">
@@ -359,26 +370,7 @@ function TaskRow({
         </div>
         <div className="text-ink-mute font-mono text-[11px]">
           {meta}
-          {t.link && (
-            <>
-              {" · "}
-              <a
-                href={t.link}
-                className="text-brass hover:underline"
-                {...(isExternalLink(t.link)
-                  ? { target: "_blank", rel: "noopener noreferrer" }
-                  : {})}
-              >
-                link ↗
-              </a>
-            </>
-          )}
         </div>
-        {t.notes && (
-          <p className="text-ink-dim mt-1 text-[13px] whitespace-pre-line">
-            {t.notes}
-          </p>
-        )}
       </div>
       <div className="flex shrink-0 gap-2">
         {done ? (

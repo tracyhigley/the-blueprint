@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/server";
-import { sendAllDue } from "@/lib/future-tasks-db";
+import { deleteOldDone, sendAllDue } from "@/lib/future-tasks-db";
 import { getSiteUrlFromEnv } from "@/lib/site-url";
 
 export const runtime = "nodejs";
@@ -25,7 +25,14 @@ export async function GET(req: NextRequest) {
     const futureTasks = await sendAllDue(supabaseAdmin(), {
       siteUrl: getSiteUrlFromEnv(),
     });
-    return NextResponse.json({ futureTasks });
+    // Done Future Tasks older than 10 days are deleted (Tracy, 2026-11-05).
+    let deletedDone = 0;
+    try {
+      deletedDone = await deleteOldDone(supabaseAdmin());
+    } catch (e) {
+      console.warn("future tasks cleanup", e);
+    }
+    return NextResponse.json({ futureTasks, deletedDone });
   } catch (e) {
     return NextResponse.json(
       {

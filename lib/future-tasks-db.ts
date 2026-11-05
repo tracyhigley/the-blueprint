@@ -5,6 +5,7 @@
 import {
   type CleanTask,
   type FutureTask,
+  DONE_KEEP_DAYS,
   dueTasks,
   fieldNoteNotes,
   futureTasksToday,
@@ -220,6 +221,8 @@ export async function sendDueForBlueprint(
         box: "DROP",
         title: t.title,
         notes: fieldNoteNotes(t, opts.siteUrl, opts.today),
+        // the building picked on the task is preselected when the note is triaged
+        ...(t.building ? { area: t.building } : {}),
         // a to-do the hub sent keeps its source and key, so closing it by key also closes this note
         ...(t.external_key ? { tag: t.source, source: t.source, external_key: t.external_key } : {}),
         urgent: false,
@@ -269,6 +272,26 @@ export async function notifySlack(
   });
   if (!res.ok) throw new Error(`Slack said ${res.status}`);
   return true;
+}
+
+/**
+ * Deletes done tasks whose done date is more than DONE_KEEP_DAYS ago (the page
+ * stops showing them at the same moment). Field Notes already made from them
+ * are left alone. Returns how many were deleted.
+ */
+export async function deleteOldDone(
+  admin: Db,
+  now: Date = new Date(),
+): Promise<number> {
+  const cutoff = new Date(now.getTime() - DONE_KEEP_DAYS * 86400000).toISOString();
+  const { data, error } = await admin
+    .from(TABLE)
+    .delete()
+    .not("done_at", "is", null)
+    .lt("done_at", cutoff)
+    .select("id");
+  fail(error);
+  return (data ?? []).length;
 }
 
 /** The morning job: every blueprint with something due. */

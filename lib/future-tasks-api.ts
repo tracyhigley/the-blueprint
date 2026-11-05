@@ -27,6 +27,24 @@ export async function requireCtx() {
   return { sb, userId: user.id as string, blueprintId: data.blueprint_id as string };
 }
 
+/** A building picked on a task has to be one of this blueprint's buildings (Settings → Buildings). */
+export async function checkBuilding(
+  sb: Awaited<ReturnType<typeof requireCtx>>["sb"],
+  blueprintId: string,
+  building: string | null | undefined,
+): Promise<void> {
+  if (!building) return;
+  const { data } = await sb
+    .from("settings")
+    .select("buildings")
+    .eq("blueprint_id", blueprintId)
+    .maybeSingle();
+  const keys = ((data?.buildings as { key?: string }[] | null) ?? []).map(
+    (b) => b.key,
+  );
+  if (!keys.includes(building)) throw new BadInput("pick a building from the list");
+}
+
 export async function readJson(req: Request): Promise<Record<string, unknown>> {
   try {
     const body = await req.json();

@@ -5,8 +5,9 @@
 // How it works: a task with a date waits on /future-tasks until its day.
 // On that day (or the first run after, if it was added late) the morning
 // job copies it into Field Notes and posts one Slack message. A one-off
-// task is then marked sent (done_at) and sits in the Sent list for 30
-// days; a repeating task moves to its next date AFTER today instead.
+// task is then marked sent (done_at) and sits in the Done list for 10
+// days, after which the morning job deletes it; a repeating task moves to
+// its next date AFTER today instead.
 
 import { formatInTimeZone } from "date-fns-tz";
 
@@ -42,6 +43,8 @@ export type FutureTask = {
   anchor_day: number | null;
   link: string | null;
   notes: string | null;
+  /** a building key from Settings → Buildings; becomes the Field Note's building */
+  building?: string | null;
   created_at: string;
   updated_at: string;
   done_at: string | null;
@@ -55,8 +58,9 @@ export type FutureTask = {
 export const TITLE_MAX = 200;
 export const LINK_MAX = 500;
 export const NOTES_MAX = 2000;
-export const SENT_LIST_DAYS = 30;
-export const SENT_LIST_MAX = 50;
+/** Done tasks are shown for this many days, then the morning job deletes them. */
+export const DONE_KEEP_DAYS = 10;
+export const DONE_LIST_MAX = 50;
 
 // ---------- dates (plain YYYY-MM-DD strings, no time zones) ----------
 
@@ -154,6 +158,7 @@ export type TaskInput = {
   repeat?: unknown;
   link?: unknown;
   notes?: unknown;
+  building?: unknown;
 };
 
 export type CleanTask = {
@@ -163,6 +168,8 @@ export type CleanTask = {
   anchor_day: number | null;
   link: string | null;
   notes: string | null;
+  /** only present when the caller sent one — the hub never does, so it never clears a building */
+  building?: string | null;
 };
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
@@ -251,17 +258,24 @@ export function validateTask(input: TaskInput): Result<CleanTask> {
     notes = n || null;
   }
 
-  return {
-    ok: true,
-    value: {
-      title,
-      due_on,
-      repeat,
-      anchor_day: due_on ? parts(due_on)[2] : null,
-      link: link.value,
-      notes,
-    },
+  const value: CleanTask = {
+    title,
+    due_on,
+    repeat,
+    anchor_day: due_on ? parts(due_on)[2] : null,
+    link: link.value,
+    notes,
   };
+  if (input.building !== undefined) {
+    if (input.building === null || input.building === "") value.building = null;
+    else if (
+      typeof input.building === "string" &&
+      /^[A-Za-z0-9_-]{1,60}$/.test(input.building)
+    )
+      value.building = input.building;
+    else return { ok: false, error: "pick a building from the list" };
+  }
+  return { ok: true, value };
 }
 
 // ---------- what's due / what happens when it's sent ----------
@@ -353,30 +367,68 @@ export function isoToEasternYmd(iso: string): string {
   return formatInTimeZone(new Date(iso), FUTURE_TASKS_TZ, "yyyy-MM-dd");
 }
 
-/** e.g. "Due Mon Nov 3 · Every month · last sent Oct 3 · link ↗" */
-export function metaLine(t: FutureTask, today: string): string {
-  const bits: string[] = [];
-  if (!t.due_on) bits.push("Someday");
-  else if (t.due_on === today) bits.push("Due today");
-  else if (t.due_on < today) {
-    const n = dayDiff(today, t.due_on);
-    bits.push(
-      `Was due ${prettyDate(t.due_on)} (${n} day${n === 1 ? "" : "s"} ago)`,
-    );
-  } else bits.push(`Due ${prettyDate(t.due_on)}`);
-  if (t.repeat !== "none") bits.push(repeatLabel(t.repeat));
-  if (t.last_done_at)
-    bits.push(
-      `last sent ${prettyDate(isoToEasternYmd(t.last_done_at), false)}`,
-    );
-  return bits.join(" · ");
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function ordinal(n: number): string {
+  const v = n % 100;
+  if (v >= 11 && v <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+}
+
+/** "Every Monday", "Every month on the 3rd" … worked out from the task's date. */
+export function repeatRule(t: FutureTask): string {
+  const anchor = t.anchor_day ?? (t.due_on ? parts(t.due_on)[2] : 1);
+  const weekday = t.due_on ? WEEKDAYS[new Date(`${t.due_on}T00:00:00Z`).getUTCDay()] : null;
+  switch (t.repeat) {
+    case "weekly":
+      return weekday ? `Every ${weekday}` : "Every week";
+    case "biweekly":
+      return weekday ? `Every other ${weekday}` : "Every 2 weeks";
+    case "monthly":
+      return `Every month on the ${ordinal(anchor)}`;
+    case "quarterly":
+      return `Every 3 months on the ${ordinal(anchor)}`;
+    case "every90days":
+      return "Every 90 days";
+    case "semiannual":
+      return `Every 6 months on the ${ordinal(anchor)}`;
+    case "yearly":
+      return t.due_on
+        ? `Every year on ${prettyDate(t.due_on, false)}`
+        : "Every year";
+    default:
+      return "";
+  }
+}
+
+/** "Mon Nov 9", with the year added when it isn't this year (yearly tasks land next year). */
+function dateWithYear(date: string, today: string): string {
+  return date.slice(0, 4) === today.slice(0, 4)
+    ? prettyDate(date)
+    : `${prettyDate(date)}, ${date.slice(0, 4)}`;
+}
+
+/** The one line shown under a task's title: its date, or its repeat rule and next date. */
+export function whenLine(t: FutureTask, today: string): string {
+  if (t.repeat !== "none" && t.due_on) {
+    const next =
+      t.due_on === today
+        ? "due today"
+        : t.due_on < today
+          ? `was due ${dateWithYear(t.due_on, today)}`
+          : `next ${dateWithYear(t.due_on, today)}`;
+    return `${repeatRule(t)} · ${next}`;
+  }
+  if (!t.due_on) return "Someday";
+  if (t.due_on === today) return "Today";
+  if (t.due_on < today) return `Was due ${dateWithYear(t.due_on, today)}`;
+  return dateWithYear(t.due_on, today);
 }
 
 export type PageGroups = {
-  waiting: FutureTask[];
-  coming: FutureTask[];
-  someday: FutureTask[];
-  sent: FutureTask[];
+  upcoming: FutureTask[];
+  recurring: FutureTask[];
+  done: FutureTask[];
 };
 
 export function groupTasks(
@@ -384,7 +436,7 @@ export function groupTasks(
   today: string,
   now: Date = new Date(),
 ): PageGroups {
-  const cutoff = now.getTime() - SENT_LIST_DAYS * 86400000;
+  const cutoff = now.getTime() - DONE_KEEP_DAYS * 86400000;
   const byDue = (a: FutureTask, b: FutureTask) =>
     a.due_on! < b.due_on!
       ? -1
@@ -394,17 +446,19 @@ export function groupTasks(
           ? -1
           : 1;
   const open = tasks.filter((t) => !t.done_at);
+  const oneOff = open.filter((t) => t.repeat === "none");
   return {
-    // Normally empty: due but the job hasn't run yet (or a put-back).
-    waiting: open.filter((t) => t.due_on && t.due_on <= today).sort(byDue),
-    coming: open.filter((t) => t.due_on && t.due_on > today).sort(byDue),
-    someday: open
-      .filter((t) => !t.due_on)
-      .sort((a, b) => (a.created_at < b.created_at ? -1 : 1)),
-    sent: tasks
+    // Every one-off task: dated ones by date, then the undated "someday" ones.
+    upcoming: [
+      ...oneOff.filter((t) => t.due_on).sort(byDue),
+      ...oneOff
+        .filter((t) => !t.due_on)
+        .sort((a, b) => (a.created_at < b.created_at ? -1 : 1)),
+    ],
+    recurring: open.filter((t) => t.repeat !== "none" && t.due_on).sort(byDue),
+    done: tasks
       .filter((t) => t.done_at && new Date(t.done_at).getTime() >= cutoff)
-      .sort((a, b) => (a.done_at! > b.done_at! ? -1 : 1))
-      .slice(0, SENT_LIST_MAX),
+      .sort((a, b) => (a.done_at! > b.done_at! ? -1 : 1)),
   };
 }
 

@@ -8,13 +8,16 @@ import {
   dueTasks,
   groupTasks,
   nextAfter,
+  repeatRule,
   slackMessage,
   stepRepeat,
+  whenLine,
   validateTask,
   futureTasksToday,
 } from "./future-tasks";
 import {
   addTask,
+  deleteOldDone,
   deleteTask,
   editTask,
   getTask,
@@ -76,6 +79,14 @@ function fakeDb(seed: Record<string, Row[]> = {}) {
       },
       is(k: string, v: unknown) {
         filters.push((r) => (r[k] ?? null) === v);
+        return q;
+      },
+      lt(k: string, v: string) {
+        filters.push((r) => r[k] != null && (r[k] as string) < v);
+        return q;
+      },
+      not(k: string, op: string, v: unknown) {
+        filters.push((r) => op === "is" && v === null && (r[k] ?? null) !== null);
         return q;
       },
       lte(k: string, v: string) {
@@ -320,23 +331,57 @@ describe("page", () => {
   const today = "2026-10-24";
   const now = new Date("2026-10-24T16:00:00Z");
 
-  it("groups tasks and hides old sent ones", () => {
+  it("splits into Upcoming and Recurring, and hides done ones after 10 days", () => {
     const g = groupTasks(
       [
         task({ id: "c2", due_on: "2026-12-01" }),
         task({ id: "c1", due_on: "2026-11-01" }),
         task({ id: "s" }),
         task({ id: "w", due_on: "2026-10-24" }),
+        task({ id: "r2", due_on: "2026-11-20", repeat: "monthly" }),
+        task({ id: "r1", due_on: "2026-10-30", repeat: "weekly" }),
         task({ id: "d1", done_at: "2026-10-20T12:00:00Z" }),
-        task({ id: "old", done_at: "2026-09-01T12:00:00Z" }),
+        task({ id: "edge", done_at: "2026-10-14T16:00:01Z" }),
+        task({ id: "old", done_at: "2026-10-14T15:59:59Z" }),
       ],
       today,
       now,
     );
-    expect(g.coming.map((t) => t.id)).toEqual(["c1", "c2"]);
-    expect(g.someday.map((t) => t.id)).toEqual(["s"]);
-    expect(g.waiting.map((t) => t.id)).toEqual(["w"]);
-    expect(g.sent.map((t) => t.id)).toEqual(["d1"]);
+    // every non-recurring task is Upcoming: dated by date (incl. due today), someday last
+    expect(g.upcoming.map((t) => t.id)).toEqual(["w", "c1", "c2", "s"]);
+    expect(g.recurring.map((t) => t.id)).toEqual(["r1", "r2"]);
+    expect(g.done.map((t) => t.id)).toEqual(["d1", "edge"]);
+  });
+
+  it("describes when a task occurs", () => {
+    const rec = (repeat: Repeat, due_on: string, anchor_day: number | null = null) =>
+      task({ repeat, due_on, anchor_day });
+    // 2026-11-09 is a Monday
+    expect(repeatRule(rec("weekly", "2026-11-09"))).toBe("Every Monday");
+    expect(repeatRule(rec("biweekly", "2026-11-09"))).toBe("Every other Monday");
+    expect(repeatRule(rec("monthly", "2026-11-03", 3))).toBe("Every month on the 3rd");
+    expect(repeatRule(rec("monthly", "2026-11-22", 22))).toBe("Every month on the 22nd");
+    expect(repeatRule(rec("quarterly", "2026-11-11", 11))).toBe("Every 3 months on the 11th");
+    expect(repeatRule(rec("every90days", "2026-11-09"))).toBe("Every 90 days");
+    expect(repeatRule(rec("yearly", "2026-11-03"))).toBe("Every year on Nov 3");
+    expect(whenLine(rec("weekly", "2026-11-09"), "2026-11-05")).toBe("Every Monday · next Mon Nov 9");
+    expect(whenLine(rec("weekly", "2026-11-05"), "2026-11-05")).toBe("Every Thursday · due today");
+    expect(whenLine(task({ due_on: "2026-11-09" }), "2026-11-05")).toBe("Mon Nov 9");
+    expect(whenLine(task({ due_on: "2026-11-05" }), "2026-11-05")).toBe("Today");
+    expect(whenLine(task({ due_on: "2026-11-02" }), "2026-11-05")).toBe("Was due Mon Nov 2");
+    expect(whenLine(task({}), "2026-11-05")).toBe("Someday");
+    expect(whenLine(rec("yearly", "2027-11-01"), "2026-11-05")).toBe("Every year on Nov 1 · next Mon Nov 1, 2027");
+  });
+
+  it("keeps the building only when one was sent, and checks its shape", () => {
+    const ok = (b: unknown) => validateTask({ title: "x", building: b });
+    expect(validateTask({ title: "x" })).toMatchObject({ ok: true });
+    expect("building" in (validateTask({ title: "x" }) as { value: object }).value).toBe(false);
+    expect((ok("THE_PRESS") as { value: { building: unknown } }).value.building).toBe("THE_PRESS");
+    expect((ok("") as { value: { building: unknown } }).value.building).toBeNull();
+    expect((ok(null) as { value: { building: unknown } }).value.building).toBeNull();
+    expect(ok("bad key; drop").ok).toBe(false);
+    expect(ok(5).ok).toBe(false);
   });
 
   it("escapes what was typed", () => {
@@ -359,9 +404,40 @@ describe("page", () => {
     );
     expect(html).not.toContain("<script>alert(1)");
     expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
-    expect(html).toContain("&lt;b&gt;hi&lt;/b&gt;");
-    expect(html).toContain("Coming up");
-    expect(html).not.toContain("Someday");
+    // the list shows only the title and when; notes stay stored but are not on this page
+    expect(html).not.toContain("hi&lt;/b&gt;");
+    expect(html).toContain("Upcoming");
+    expect(html).not.toContain("Recurring");
+  });
+
+  it("shows only the title and when, in two sections, with a building dropdown in the form", () => {
+    const html = renderToStaticMarkup(
+      createElement(FutureTasksBoard, {
+        today,
+        buildings: [
+          { key: "THE_PRESS", label: "The Press" },
+          { key: "THE_LIBRARY", label: "The Library" },
+        ],
+        groups: groupTasks(
+          [
+            task({ id: "a", title: "Order labels", due_on: "2026-11-09", notes: "secret details", link: "https://x.example.com", building: "THE_PRESS" }),
+            task({ id: "b", title: "Pay quarterly tax", due_on: "2026-11-09", repeat: "weekly", notes: "more details" }),
+          ],
+          today,
+          now,
+        ),
+      }),
+    );
+    expect(html).toContain("Upcoming");
+    expect(html).toContain("Recurring");
+    expect(html).toContain("Order labels");
+    expect(html).toContain("Mon Nov 9");
+    expect(html).toContain("Every Monday · next Mon Nov 9");
+    expect(html).not.toContain("secret details");
+    expect(html).not.toContain("more details");
+    expect(html).not.toContain("link ↗");
+    expect(html).toContain("The Press");
+    expect(html).toContain("The Library");
   });
 
   it("shows the empty message", () => {
@@ -553,5 +629,41 @@ describe("database round trip", () => {
     expect(first.length).toBe(1);
     expect(second).toEqual([]);
     expect(db.tables.items.length).toBe(1);
+  });
+});
+
+describe("building and clean-up", () => {
+  it("a task's building lands on its Field Note; one without a building sends nothing extra", async () => {
+    const db = fakeDb({ blueprints: [{ id: V, owner_id: USER }] });
+    await addTask(db, V, USER, clean({ title: "Order labels", show_on: "2026-10-24", building: "THE_PRESS" }));
+    await addTask(db, V, USER, clean({ title: "No building", show_on: "2026-10-24" }));
+    await sendDueForBlueprint(db, V, { today: "2026-10-24", siteUrl: "https://x.test" });
+    const notes = db.tables.items as Row[];
+    expect(notes.find((i) => i.title === "Order labels")).toMatchObject({ box: "DROP", area: "THE_PRESS" });
+    expect("area" in (notes.find((i) => i.title === "No building") as Row)).toBe(false);
+  });
+
+  it("editing from the page can clear the building; the hub's edits don't touch it", async () => {
+    const db = fakeDb();
+    const t = await addTask(db, V, USER, clean({ title: "A", show_on: "2026-12-01", building: "THE_PRESS" }));
+    expect((db.tables.future_tasks[0] as Row).building).toBe("THE_PRESS");
+    await editTask(db, V, t.id, clean({ title: "A2", show_on: "2026-12-01" })); // no building sent
+    expect((db.tables.future_tasks[0] as Row).building).toBe("THE_PRESS");
+    await editTask(db, V, t.id, clean({ title: "A2", show_on: "2026-12-01", building: "" }));
+    expect((db.tables.future_tasks[0] as Row).building).toBeNull();
+  });
+
+  it("deletes done tasks older than 10 days and nothing else", async () => {
+    const now = new Date("2026-11-05T12:00:00Z");
+    const db = fakeDb({
+      future_tasks: [
+        { id: "old", done_at: "2026-10-25T11:00:00Z" },
+        { id: "recent", done_at: "2026-10-26T13:00:00Z" },
+        { id: "open", done_at: null },
+        { id: "hub-old", done_at: "2026-09-01T00:00:00Z", external_key: "k", source: "finance" },
+      ],
+    });
+    expect(await deleteOldDone(db, now)).toBe(2);
+    expect((db.tables.future_tasks as Row[]).map((r) => r.id)).toEqual(["recent", "open"]);
   });
 });

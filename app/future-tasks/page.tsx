@@ -6,6 +6,7 @@ import { getCurrentBlueprint } from "@/lib/data";
 import { supabaseServer } from "@/lib/supabase/server";
 import { futureTasksToday, groupTasks } from "@/lib/future-tasks";
 import { listTasks } from "@/lib/future-tasks-db";
+import { getBuildings } from "@/lib/categories";
 import { FutureTasksBoard } from "@/components/future-tasks-board";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function FutureTasksPage() {
   const blueprint = await getCurrentBlueprint();
   const today = futureTasksToday();
+  const buildings = await getBuildings();
   let tasks: Awaited<ReturnType<typeof listTasks>> = [];
   if (blueprint) {
     try {
@@ -31,7 +33,11 @@ export default async function FutureTasksPage() {
         On its day, each task goes into Field Notes early in the morning and you
         get a Slack alert in #Alerts.
       </p>
-      <FutureTasksBoard groups={groupTasks(tasks, today)} today={today} />
+      <FutureTasksBoard
+        groups={groupTasks(tasks, today)}
+        today={today}
+        buildings={buildings.map((b) => ({ key: b.key, label: b.label }))}
+      />
     </div>
   );
 }
