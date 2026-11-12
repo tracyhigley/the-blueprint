@@ -127,12 +127,26 @@ export async function closeHubTodo(
 ): Promise<number> {
   const now = new Date().toISOString();
   let n = 0;
+  // Field Notes (box DROP) only hides rows that are deleted — it ignores `state` — so a note still sitting
+  // there is removed the same way the app's own delete does it. Once sent on to a building, "done" is what hides it.
+  const { data: notes, error: e0 } = await admin
+    .from("items")
+    .update({ state: "done", deleted_at: now, today_order: null, modified_at: now })
+    .eq("blueprint_id", blueprintId)
+    .eq("source", t.source)
+    .eq("external_key", t.key)
+    .eq("box", "DROP")
+    .is("deleted_at", null)
+    .select("id");
+  fail(e0);
+  n += notes?.length ?? 0;
   const { data: items, error: e1 } = await admin
     .from("items")
     .update({ state: "done", modified_at: now })
     .eq("blueprint_id", blueprintId)
     .eq("source", t.source)
     .eq("external_key", t.key)
+    .not("box", "eq", "DROP")
     .is("deleted_at", null)
     .select("id");
   fail(e1);

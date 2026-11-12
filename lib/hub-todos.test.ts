@@ -153,8 +153,22 @@ describe("closing", () => {
     await upsertHubTodo(db, BP, OWNER, todo());
     expect(await closeHubTodo(db, BP, { source: "finance", key: "categorize-backlog:swb" })).toBe(1);
     expect(db.tables.items[0].state).toBe("done");
-    expect(await closeHubTodo(db, BP, { source: "finance", key: "categorize-backlog:swb" })).toBe(1); // already done: still found, nothing breaks
+    expect(await closeHubTodo(db, BP, { source: "finance", key: "categorize-backlog:swb" })).toBe(0); // already closed: nothing left to change, nothing breaks
     expect(await closeHubTodo(db, BP, { source: "finance", key: "never-existed" })).toBe(0);
+  });
+  it("takes a closed to-do out of Field Notes, which only shows rows that are not deleted", async () => {
+    const db = fakeDb();
+    await upsertHubTodo(db, BP, OWNER, todo({ source: "pcs", key: "restock:abc" }));
+    expect(db.tables.items.filter((r) => r.box === "DROP" && !r.deleted_at)).toHaveLength(1);
+    await closeHubTodo(db, BP, { source: "pcs", key: "restock:abc" });
+    expect(db.tables.items.filter((r) => r.box === "DROP" && !r.deleted_at)).toHaveLength(0);
+  });
+  it("marks a to-do done (not deleted) once it has been sent on to a building", async () => {
+    const db = fakeDb();
+    await upsertHubTodo(db, BP, OWNER, todo());
+    db.tables.items[0].box = "PROJECT_TASKS";
+    expect(await closeHubTodo(db, BP, { source: "finance", key: "categorize-backlog:swb" })).toBe(1);
+    expect(db.tables.items[0]).toMatchObject({ state: "done", deleted_at: null });
   });
   it("closes a dated one that has not been sent yet, so it never goes to Field Notes", async () => {
     const db = fakeDb();
