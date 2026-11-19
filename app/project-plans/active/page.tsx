@@ -93,7 +93,7 @@ export default async function AllProjectPlansPage() {
   return (
     <div className="mx-auto max-w-[900px] px-4 py-8 md:px-10">
       <div className="md:flex md:items-start md:justify-between md:gap-8">
-        <div className="min-w-0">
+        <div className="min-w-0 md:w-[280px] md:shrink-0">
         <Link
           href="/project-plans"
           className="text-ink-mute hover:text-brass font-mono text-[10px] tracking-[0.2em]"
@@ -111,7 +111,7 @@ export default async function AllProjectPlansPage() {
         </div>
         </div>
 
-        <aside className="border-paper-line bg-paper-panel/40 mt-6 rounded-sm border px-5 py-4 text-[14px] leading-relaxed md:mt-0 md:w-[340px] md:shrink-0">
+        <aside className="border-paper-line bg-paper-panel/40 mt-6 rounded-sm border px-5 py-4 text-[14px] leading-relaxed md:mt-0 md:flex-1">
           <p className="text-ink font-semibold">
             I do not need to see everything at once!
           </p>
@@ -135,7 +135,7 @@ export default async function AllProjectPlansPage() {
           </p>
           <p className="text-ink-dim mt-2">
             <strong className="text-ink">Plan:</strong> Every 10 days, choose
-            which projects get to move up to Under Construction (1) and to
+            which projects get to move up to Under Construction (1 per building) and to
             Planning (4 or less per building). Then fill in the 10-day plan and
             work from that.
           </p>
