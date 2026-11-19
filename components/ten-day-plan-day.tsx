@@ -67,7 +67,6 @@ function SlotRow({
         {choices.map((p) => (
           <option key={p.id} value={p.id}>
             {p.title}
-            {p.priority ? ` (Priority ${p.priority})` : ""}
             {p.planning ? " · planning" : ""}
             {p.buildingLabel && choices.some((c) => c.buildingLabel !== p.buildingLabel)
               ? ` — ${p.buildingLabel}`
