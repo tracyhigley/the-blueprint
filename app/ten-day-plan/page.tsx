@@ -38,15 +38,16 @@ export default async function TenDayPlanPage() {
     buildingLabel: buildingByKey.get(p.building)?.label ?? "Uncategorized",
     buildingColor: buildingByKey.get(p.building)?.color,
     complete: p.phase === "complete",
+    planning: p.phase === "planning",
     priority: p.priority,
     daysToBuild: p.daysToBuild,
   }));
   const byId = new Map(planProjects.map((p) => [p.id, p]));
 
-  // Only projects under construction can be picked, best priority first
-  // (unset last), then by name.
+  // Projects under construction or still in Planning can be picked, best
+  // priority first (unset last), then by name.
   const pickable = projects
-    .filter((p) => p.phase === "building")
+    .filter((p) => p.phase === "building" || p.phase === "planning")
     .sort(
       (a, b) =>
         (a.priority ?? 99) - (b.priority ?? 99) || a.title.localeCompare(b.title),

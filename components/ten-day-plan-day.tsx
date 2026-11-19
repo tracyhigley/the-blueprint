@@ -22,6 +22,7 @@ export type PlanProject = {
   buildingLabel: string;
   buildingColor?: string;
   complete: boolean;
+  planning: boolean;
   priority: number | null;
   daysToBuild: number | null;
 };
@@ -67,6 +68,7 @@ function SlotRow({
           <option key={p.id} value={p.id}>
             {p.title}
             {p.priority ? ` (Priority ${p.priority})` : ""}
+            {p.planning ? " · planning" : ""}
             {p.buildingLabel && choices.some((c) => c.buildingLabel !== p.buildingLabel)
               ? ` — ${p.buildingLabel}`
               : ""}
@@ -105,6 +107,7 @@ function SlotRow({
           {dayNumber
             ? ` · Day ${dayNumber.n}${dayNumber.of ? ` of ${dayNumber.of}` : ""}`
             : ""}
+          {project?.planning ? " · planning" : ""}
           {project?.complete ? " · finished" : ""}
           {slot.worked ? " · worked on it" : ""}
         </div>
