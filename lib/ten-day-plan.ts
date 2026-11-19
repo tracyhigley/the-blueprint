@@ -9,6 +9,10 @@ import { format } from "date-fns";
 // ever renamed/rekeyed, update this to match.
 export const PRESS_BUILDING_KEY = "THE_PRESS";
 
+// The Library's projects never go in the "Other buildings" slots. Same
+// hardcode-the-key convention as the Press key above.
+export const LIBRARY_BUILDING_KEY = "THE_LIBRARY";
+
 export const PLAN_LENGTH = 10;
 export const OTHER_SLOT_COUNT = 2;
 // One Press project + two other-building projects.

@@ -9,6 +9,7 @@ import { getProjects, getTenDayPlan } from "@/lib/projects";
 import { getItemsByBox } from "@/lib/data";
 import { todayYmd } from "@/lib/day-timezone";
 import {
+  LIBRARY_BUILDING_KEY,
   PRESS_BUILDING_KEY,
   countSlots,
   emptyDay,
@@ -56,7 +57,10 @@ export default async function TenDayPlanPage() {
     .filter((p) => p.building === PRESS_BUILDING_KEY)
     .map((p) => byId.get(p.id)!);
   const otherChoices = pickable
-    .filter((p) => p.building !== PRESS_BUILDING_KEY)
+    .filter(
+      (p) =>
+        p.building !== PRESS_BUILDING_KEY && p.building !== LIBRARY_BUILDING_KEY,
+    )
     .map((p) => byId.get(p.id)!);
 
   // Open Maint Tasks by building — same filter the old This Week page used
