@@ -19,6 +19,8 @@ import { groupIdeasByStrategy } from "@/lib/idea-groups";
 import { getProjects, type Project } from "@/lib/projects";
 import type { ProjectPhase } from "@/lib/project-phases";
 import { DownloadProjectsButton } from "@/components/download-projects-button";
+import { todayYmd } from "@/lib/day-timezone";
+import { runOutDate } from "@/lib/run-out-date";
 import { ProjectNumberSelect } from "@/components/project-number-select";
 
 const SECTIONS: { phase: ProjectPhase; label: string; empty: string }[] = [
@@ -82,22 +84,62 @@ export default async function AllProjectPlansPage() {
     return groups.filter((g) => g.projects.length > 0);
   }
 
+  // Every project that isn't complete, Days to Build added up (unset = 0).
+  const totalOpenDays = projects
+    .filter((p) => p.phase !== "complete")
+    .reduce((n, p) => n + (p.daysToBuild ?? 0), 0);
+  const runOutAt = runOutDate(totalOpenDays, todayYmd());
+
   return (
     <div className="mx-auto max-w-[900px] px-4 py-8 md:px-10">
-      <Link
-        href="/project-plans"
-        className="text-ink-mute hover:text-brass font-mono text-[10px] tracking-[0.2em]"
-      >
-        ← MASTER PROJECT PLANS
-      </Link>
-      <h1 className="serif-h mt-3 text-[28px] leading-tight md:text-[36px]">
-        All plans.
-      </h1>
-      <p className="text-ink-dim mt-1 text-[13px]">
-        Every project under construction, in planning, or still an idea.
-      </p>
-      <div className="mt-4">
-        <DownloadProjectsButton />
+      <div className="md:flex md:items-start md:justify-between md:gap-8">
+        <div className="min-w-0">
+        <Link
+          href="/project-plans"
+          className="text-ink-mute hover:text-brass font-mono text-[10px] tracking-[0.2em]"
+        >
+          ← MASTER PROJECT PLANS
+        </Link>
+        <h1 className="serif-h mt-3 text-[28px] leading-tight md:text-[36px]">
+          All plans.
+        </h1>
+        <p className="text-ink-dim mt-1 text-[13px]">
+          Every project under construction, in planning, or still an idea.
+        </p>
+        <div className="mt-4">
+          <DownloadProjectsButton />
+        </div>
+        </div>
+
+        <aside className="border-paper-line bg-paper-panel/40 mt-6 rounded-sm border px-5 py-4 text-[14px] leading-relaxed md:mt-0 md:w-[340px] md:shrink-0">
+          <p className="text-ink font-semibold">
+            I do not need to see everything at once!
+          </p>
+          <p className="text-ink-dim mt-2">
+            Each work day I hope to get 2 focused hours on Writing, 3 focused
+            hours on The Press, and 3 focused hours on other buildings,
+            including their maintenance tasks.
+          </p>
+          <p className="text-ink-dim mt-2">
+            This 8 hours should be plenty to move projects along very well.
+          </p>
+          <p className="text-ink-dim mt-2">
+            {runOutAt ? (
+              <>
+                Currently, I will run out of projects on{" "}
+                <strong className="text-ink">{runOutAt}</strong>.
+              </>
+            ) : (
+              "Add Days to your projects to see when I'll run out of them."
+            )}
+          </p>
+          <p className="text-ink-dim mt-2">
+            <strong className="text-ink">Plan:</strong> Every 10 days, choose
+            which projects get to move up to Under Construction (1) and to
+            Planning (4 or less per building). Then fill in the 10-day plan and
+            work from that.
+          </p>
+        </aside>
       </div>
 
       {SECTIONS.map((section) => {
