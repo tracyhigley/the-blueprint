@@ -14,11 +14,14 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { describeZodError } from "@/lib/zod-error";
 import { todayYmd } from "@/lib/day-timezone";
 import {
-  isDayKey,
-  type DayKey,
-  type WeekBuildings,
-  type WeekDayProjects,
-} from "@/lib/week-days";
+  countSlots,
+  normalizeDay,
+  normalizePlan,
+  planDates,
+  planHasAnyEntries,
+  type PlanDay,
+  type TenDayPlan,
+} from "@/lib/ten-day-plan";
 
 async function requireUser() {
   const sb = await supabaseServer();
@@ -128,99 +131,62 @@ export async function saveBuildingStrategies(
   revalidatePath("/settings/buildings");
 }
 
-// ─── This Week (settings.week_buildings / settings.week_day_projects) ──────
-// A fixed Sun–Sat template (not tied to calendar dates, see lib/week-days.ts).
-// Each day can have more than one building chosen (multi-select); within a
-// building that has projects under construction, one project can be
-// "featured" for that day via a dropdown. Both read-modify-write on the
-// single settings row so a rapid edit never clobbers another day's/
-// building's choice made moments earlier.
+// ─── 10-Day Plan (settings.ten_day_plan) ────────────────────────────────────
+// One jsonb blob: the plan's start date, each day's picks, and a short list of
+// past plans. Every write is read-modify-write on the single settings row so a
+// rapid edit to one day never clobbers another made moments earlier.
 
-export async function saveWeekBuildings(day: DayKey, buildingKeys: string[]) {
-  if (!isDayKey(day)) throw new Error("Invalid day");
+export async function startTenDayPlan() {
   const { sb } = await requireUser();
   const blueprintId = await currentBlueprintId();
   if (!blueprintId) throw new Error("No blueprint");
-  const clean = Array.from(
-    new Set(
-      buildingKeys.filter((k) => typeof k === "string" && k.trim().length > 0),
-    ),
-  );
   const { data } = await sb
     .from("settings")
-    .select("week_buildings, week_day_projects")
+    .select("ten_day_plan")
     .eq("blueprint_id", blueprintId)
     .maybeSingle();
-  const currentBuildings = (data?.week_buildings as WeekBuildings | null) ?? {};
-  const nextBuildings: WeekBuildings = { ...currentBuildings, [day]: clean };
-
-  // Drop any featured-project pick for a building that just got unchecked
-  // for this day, so a hidden pick doesn't silently reappear if it's
-  // re-checked later with stale state.
-  const currentProjects =
-    (data?.week_day_projects as WeekDayProjects | null) ?? {};
-  const dayProjects = { ...(currentProjects[day] ?? {}) };
-  for (const buildingKey of Object.keys(dayProjects)) {
-    if (!clean.includes(buildingKey)) delete dayProjects[buildingKey];
+  const current = normalizePlan(data?.ten_day_plan);
+  // Keep the plan that's ending as a small progress record (only if anything
+  // was actually planned in it).
+  let past = current.past;
+  if (current.start && planHasAnyEntries(current)) {
+    const dates = planDates(current.start);
+    past = [
+      ...past,
+      { start: dates[0], end: dates[dates.length - 1], ...countSlots(current) },
+    ].slice(-12);
   }
-  const nextProjects: WeekDayProjects = {
-    ...currentProjects,
-    [day]: dayProjects,
-  };
-
-  const { error } = await sb.from("settings").upsert({
-    blueprint_id: blueprintId,
-    week_buildings: nextBuildings,
-    week_day_projects: nextProjects,
-  });
+  const next: TenDayPlan = { start: todayYmd(), days: {}, past };
+  const { error } = await sb
+    .from("settings")
+    .upsert({ blueprint_id: blueprintId, ten_day_plan: next });
   if (error) throw new Error(error.message);
-  revalidatePath("/this-week");
+  revalidatePath("/ten-day-plan");
 }
 
-export async function saveWeekDayProject(
-  day: DayKey,
-  building: string,
-  projectId: string | null,
-) {
-  if (!isDayKey(day)) throw new Error("Invalid day");
+export async function saveTenDayPlanDay(date: string, day: PlanDay) {
   const { sb } = await requireUser();
   const blueprintId = await currentBlueprintId();
   if (!blueprintId) throw new Error("No blueprint");
   const { data } = await sb
     .from("settings")
-    .select("week_day_projects")
+    .select("ten_day_plan")
     .eq("blueprint_id", blueprintId)
     .maybeSingle();
-  const current = (data?.week_day_projects as WeekDayProjects | null) ?? {};
-  const dayProjects = { ...(current[day] ?? {}) };
-  if (projectId) dayProjects[building] = projectId;
-  else delete dayProjects[building];
-  const next: WeekDayProjects = { ...current, [day]: dayProjects };
+  const plan = normalizePlan(data?.ten_day_plan);
+  if (!plan.start) throw new Error("Start a plan first.");
+  if (!planDates(plan.start).includes(date)) {
+    throw new Error("That day isn't in this plan.");
+  }
+  const next: TenDayPlan = {
+    ...plan,
+    days: { ...plan.days, [date]: normalizeDay(day) },
+  };
   const { error } = await sb
     .from("settings")
-    .upsert({ blueprint_id: blueprintId, week_day_projects: next });
+    .upsert({ blueprint_id: blueprintId, ten_day_plan: next });
   if (error) throw new Error(error.message);
-  revalidatePath("/this-week");
-}
-
-// This Week's Writing Project(s) — a straight full-replace of the picked
-// project ids (unlike saveWeekBuildings, this field doesn't interact with
-// any other column, so no cross-field merge needed). The client always
-// sends its complete current selection.
-export async function saveWeekWritingProjects(projectIds: string[]) {
-  const { sb } = await requireUser();
-  const blueprintId = await currentBlueprintId();
-  if (!blueprintId) throw new Error("No blueprint");
-  const clean = Array.from(
-    new Set(
-      projectIds.filter((id) => typeof id === "string" && id.trim().length > 0),
-    ),
-  );
-  const { error } = await sb
-    .from("settings")
-    .upsert({ blueprint_id: blueprintId, week_writing_projects: clean });
-  if (error) throw new Error(error.message);
-  revalidatePath("/this-week");
+  revalidatePath("/ten-day-plan");
 }
 
 // ─── Projects ────────────────────────────────────────────────────────────────

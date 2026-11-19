@@ -30,10 +30,10 @@ export function buildItems(fiftyFdHref: string): NavItem[] {
       button: true,
     },
     {
-      href: "/this-week",
-      label: "THIS WEEK",
+      href: "/ten-day-plan",
+      label: "10-DAY PLAN",
       hint: "g w",
-      match: (p) => p.startsWith("/this-week"),
+      match: (p) => p.startsWith("/ten-day-plan"),
       button: true,
     },
     {

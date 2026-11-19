@@ -20,7 +20,7 @@ export function GlobalShortcuts() {
   );
   useShortcut("g r", go("/field-notes"), { label: "Field Notes", group: "Navigate" });
   useShortcut("g t", go("/future-tasks"), { label: "Future Tasks", group: "Navigate" });
-  useShortcut("g w", go("/this-week"), { label: "This Week", group: "Navigate" });
+  useShortcut("g w", go("/ten-day-plan"), { label: "10-Day Plan", group: "Navigate" });
   useShortcut("g c", go("/maint-tasks"), { label: "Maint Tasks", group: "Navigate" });
   useShortcut("g a", go("/project-tasks"), { label: "Project Tasks", group: "Navigate" });
   useShortcut("g e", go("/documents"), { label: "NOTES", group: "Navigate" });

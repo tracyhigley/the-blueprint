@@ -9,8 +9,7 @@
 //
 // Within each building, projects sort by Priority (1 → 3, unset last).
 // Ties fall back to the saved drag order (projects.active_order) for Under
-// Construction — This Week's per-building project picker still sorts by
-// that, see app/this-week/page.tsx — or newest-edited for the others.
+// Construction — or newest-edited for the others.
 // The drag handles themselves went away with the simple list (2026-10-24);
 // ReorderableProjectCards is no longer used here.
 
