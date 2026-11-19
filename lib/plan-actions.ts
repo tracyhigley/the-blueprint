@@ -13,6 +13,9 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabase/server";
 import { describeZodError } from "@/lib/zod-error";
 import { todayYmd } from "@/lib/day-timezone";
+import { getBuildings } from "@/lib/categories";
+import { getProjects } from "@/lib/projects";
+import { projectsToCsv } from "@/lib/projects-csv";
 import {
   countSlots,
   normalizeDay,
@@ -187,6 +190,39 @@ export async function saveTenDayPlanDay(date: string, day: PlanDay) {
     .upsert({ blueprint_id: blueprintId, ten_day_plan: next });
   if (error) throw new Error(error.message);
   revalidatePath("/ten-day-plan");
+}
+
+// ─── Spreadsheet download (All Plans page) ──────────────────────────────────
+// Every project in every building, one row each, as CSV text. Read-only: the
+// button turns the returned text into a file in the browser.
+export async function exportProjectsCsv(): Promise<string> {
+  await requireUser();
+  const [buildings, projects] = await Promise.all([getBuildings(), getProjects()]);
+  const buildingOrder = new Map(buildings.map((b, i) => [b.key, i]));
+  const phaseOrder = { building: 0, planning: 1, idea: 2, complete: 3 } as const;
+  const rows = [...projects]
+    .sort(
+      (a, b) =>
+        (buildingOrder.get(a.building) ?? 999) -
+          (buildingOrder.get(b.building) ?? 999) ||
+        phaseOrder[a.phase] - phaseOrder[b.phase] ||
+        (a.priority ?? 99) - (b.priority ?? 99) ||
+        a.title.localeCompare(b.title),
+    )
+    .map((p) => {
+      const building = buildings.find((b) => b.key === p.building);
+      return {
+        building: building?.label ?? "Uncategorized",
+        title: p.title,
+        phase: p.phase,
+        priority: p.priority,
+        daysToBuild: p.daysToBuild,
+        // Labels come from settings; a missing one stays blank.
+        strategy:
+          building?.strategies?.find((s) => s.key === p.strategy)?.label ?? "",
+      };
+    });
+  return projectsToCsv(rows);
 }
 
 // ─── Projects ────────────────────────────────────────────────────────────────

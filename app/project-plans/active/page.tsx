@@ -18,6 +18,7 @@ import { getBuildings, type Strategy } from "@/lib/categories";
 import { groupIdeasByStrategy } from "@/lib/idea-groups";
 import { getProjects, type Project } from "@/lib/projects";
 import type { ProjectPhase } from "@/lib/project-phases";
+import { DownloadProjectsButton } from "@/components/download-projects-button";
 import { ProjectNumberSelect } from "@/components/project-number-select";
 
 const SECTIONS: { phase: ProjectPhase; label: string; empty: string }[] = [
@@ -95,6 +96,9 @@ export default async function AllProjectPlansPage() {
       <p className="text-ink-dim mt-1 text-[13px]">
         Every project under construction, in planning, or still an idea.
       </p>
+      <div className="mt-4">
+        <DownloadProjectsButton />
+      </div>
 
       {SECTIONS.map((section) => {
         const groups = groupsFor(section.phase);
