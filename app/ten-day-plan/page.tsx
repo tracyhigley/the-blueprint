@@ -45,13 +45,16 @@ export default async function TenDayPlanPage() {
   }));
   const byId = new Map(planProjects.map((p) => [p.id, p]));
 
-  // Projects under construction or still in Planning can be picked, best
-  // priority first (unset last), then by name.
+  // Projects under construction or still in Planning can be picked: Under
+  // Construction first, then Planning; within each, best priority first
+  // (unset last), then by name.
   const pickable = projects
     .filter((p) => p.phase === "building" || p.phase === "planning")
     .sort(
       (a, b) =>
-        (a.priority ?? 99) - (b.priority ?? 99) || a.title.localeCompare(b.title),
+        Number(a.phase === "planning") - Number(b.phase === "planning") ||
+        (a.priority ?? 99) - (b.priority ?? 99) ||
+        a.title.localeCompare(b.title),
     );
   const pressChoices = pickable
     .filter((p) => p.building === PRESS_BUILDING_KEY)
