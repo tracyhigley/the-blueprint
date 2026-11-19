@@ -1,6 +1,7 @@
 import { getBuildings } from "@/lib/categories";
 import { saveBuildingConfig } from "@/lib/plan-actions";
 import { BoxesEditor } from "@/components/boxes-editor";
+import { BuildingStrategiesEditor } from "@/components/building-strategies-editor";
 import { SettingsSubnav } from "@/components/settings-subnav";
 
 export default async function BuildingsSettingsPage() {
@@ -37,6 +38,23 @@ export default async function BuildingsSettingsPage() {
         labelPlaceholder="Name (e.g. The Library)"
         metaPlaceholder="What it's about (optional)"
       />
+
+      <h2 className="serif-h mt-12 text-[22px]">Strategies (optional)</h2>
+      <p className="text-ink-dim mt-1 text-[13px]">
+        Give a building strategies and its Idea projects sort into those groups,
+        collapsed until you open one. Leave a building empty and it looks the
+        way it always has. Save the buildings above first if you just added one.
+      </p>
+      <div className="mt-4 space-y-3">
+        {initial.map((b) => (
+          <BuildingStrategiesEditor
+            key={b.key}
+            buildingKey={b.key}
+            buildingLabel={b.label}
+            initial={b.strategies ?? []}
+          />
+        ))}
+      </div>
     </div>
   );
 }

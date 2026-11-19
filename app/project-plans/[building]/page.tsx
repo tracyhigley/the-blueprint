@@ -7,6 +7,7 @@ import { getBuildings, buildingSlug } from "@/lib/categories";
 import { getProjectsByBuilding, type Project } from "@/lib/projects";
 import { NewProjectRow } from "@/components/new-project-row";
 import { fmtHoursFromMinutes } from "@/lib/format-hours";
+import { groupIdeasByStrategy, NO_STRATEGY_KEY } from "@/lib/idea-groups";
 
 export default async function BuildingPage({
   params,
@@ -70,18 +71,44 @@ export default async function BuildingPage({
       )}
 
       <SectionHeader label="Ideas · resting" />
-      <div className="flex flex-wrap items-center gap-2">
-        {ideas.map((p) => (
-          <Link
-            key={p.id}
-            href={`/project-plans/project/${p.id}`}
-            className="rounded-full border border-paper-line bg-paper-bg-2 px-3.5 py-1.5 text-[13px] text-ink-dim transition hover:border-brass/60 hover:text-ink"
-          >
-            {p.title}
-          </Link>
-        ))}
-        <NewProjectRow building={building.key} />
-      </div>
+      {building.strategies ? (
+        // Collapsed by default so a long list of ideas stays out of sight
+        // until she's picking from one strategy.
+        <div className="space-y-2">
+          {groupIdeasByStrategy(ideas, building.strategies).map((g) => (
+            <details
+              key={g.key}
+              className="group rounded-sm border border-paper-line bg-paper-panel/40 px-4 py-2.5"
+            >
+              <summary className="cursor-pointer list-none text-[14px] text-ink marker:hidden">
+                <span className="mr-2 text-brass/70 transition group-open:rotate-90 inline-block">
+                  ▸
+                </span>
+                {g.label}
+                <span className="ml-2 font-mono text-[10px] text-ink-mute">
+                  {g.projects.length}
+                </span>
+              </summary>
+              <div className="mt-3 flex flex-wrap items-center gap-2 pb-1">
+                {g.projects.map((p) => (
+                  <IdeaPill key={p.id} project={p} />
+                ))}
+                <NewProjectRow
+                  building={building.key}
+                  strategy={g.key === NO_STRATEGY_KEY ? undefined : g.key}
+                />
+              </div>
+            </details>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          {ideas.map((p) => (
+            <IdeaPill key={p.id} project={p} />
+          ))}
+          <NewProjectRow building={building.key} />
+        </div>
+      )}
 
       {complete.length > 0 ? (
         <>
@@ -111,6 +138,17 @@ export default async function BuildingPage({
         </>
       ) : null}
     </div>
+  );
+}
+
+function IdeaPill({ project }: { project: Project }) {
+  return (
+    <Link
+      href={`/project-plans/project/${project.id}`}
+      className="rounded-full border border-paper-line bg-paper-bg-2 px-3.5 py-1.5 text-[13px] text-ink-dim transition hover:border-brass/60 hover:text-ink"
+    >
+      {project.title}
+    </Link>
   );
 }
 

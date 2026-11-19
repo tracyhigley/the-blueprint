@@ -6,7 +6,13 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 import { createProject } from "@/lib/plan-actions";
 
-export function NewProjectRow({ building }: { building: string }) {
+export function NewProjectRow({
+  building,
+  strategy,
+}: {
+  building: string;
+  strategy?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [pending, startTransition] = useTransition();
@@ -17,7 +23,7 @@ export function NewProjectRow({ building }: { building: string }) {
     setTitle("");
     startTransition(async () => {
       try {
-        await createProject(building, clean);
+        await createProject(building, clean, "idea", strategy ?? null);
         toast.success("Idea saved — resting safely.");
       } catch (e: any) {
         setTitle(clean);

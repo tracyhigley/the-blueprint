@@ -15,7 +15,8 @@
 // ReorderableProjectCards is no longer used here.
 
 import Link from "next/link";
-import { getBuildings } from "@/lib/categories";
+import { getBuildings, type Strategy } from "@/lib/categories";
+import { groupIdeasByStrategy } from "@/lib/idea-groups";
 import { getProjects, type Project } from "@/lib/projects";
 import type { ProjectPhase } from "@/lib/project-phases";
 import { ProjectNumberSelect } from "@/components/project-number-select";
@@ -38,6 +39,7 @@ type BuildingGroup = {
   key: string;
   label: string;
   color?: string;
+  strategies?: Strategy[];
   projects: Project[];
 };
 
@@ -69,6 +71,7 @@ export default async function AllProjectPlansPage() {
       key: b.key,
       label: b.label,
       color: b.color,
+      strategies: b.strategies,
       projects: inPhase.filter((p) => p.building === b.key),
     }));
     const known = new Set(buildings.map((b) => b.key));
@@ -129,11 +132,41 @@ export default async function AllProjectPlansPage() {
                     ) : null}
                     {g.label}
                   </h3>
-                  <div className="mt-2 space-y-1.5">
-                    {g.projects.map((p) => (
-                      <ProjectRow key={p.id} project={p} />
-                    ))}
-                  </div>
+                  {section.phase === "idea" && g.strategies ? (
+                    // Ideas in a building with strategies stay tucked away
+                    // until she opens one.
+                    <div className="mt-2 space-y-2">
+                      {groupIdeasByStrategy(g.projects, g.strategies).map(
+                        (sg) => (
+                          <details
+                            key={sg.key}
+                            className="group border-paper-line rounded-sm border px-4 py-2.5"
+                          >
+                            <summary className="text-ink cursor-pointer list-none text-[16px] marker:hidden">
+                              <span className="text-brass/70 mr-2 inline-block transition group-open:rotate-90">
+                                ▸
+                              </span>
+                              {sg.label}
+                              <span className="text-ink-mute ml-2 font-mono text-[10px]">
+                                {sg.projects.length}
+                              </span>
+                            </summary>
+                            <div className="mt-2 space-y-1.5 pb-1">
+                              {sg.projects.map((p) => (
+                                <ProjectRow key={p.id} project={p} />
+                              ))}
+                            </div>
+                          </details>
+                        ),
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-2 space-y-1.5">
+                      {g.projects.map((p) => (
+                        <ProjectRow key={p.id} project={p} />
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))
             )}

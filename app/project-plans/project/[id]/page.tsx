@@ -8,6 +8,7 @@ import { getProject } from "@/lib/projects";
 import { ProjectFieldEditor } from "@/components/project-field-editor";
 import { ProjectPhaseControl } from "@/components/project-phase-control";
 import { ProjectNumberSelect } from "@/components/project-number-select";
+import { ProjectStrategySelect } from "@/components/project-strategy-select";
 import { ProjectLog } from "@/components/project-log";
 import { ProjectTaskEditor } from "@/components/project-task-editor";
 import { DeleteProjectButton } from "@/components/delete-project-button";
@@ -79,6 +80,13 @@ export default async function ProjectPage({
                 label="Days to Build"
                 initial={project.daysToBuild}
               />
+              {building?.strategies ? (
+                <ProjectStrategySelect
+                  projectId={project.id}
+                  strategies={building.strategies}
+                  initial={project.strategy}
+                />
+              ) : null}
             </div>
           </div>
           <ProjectPhaseControl projectId={project.id} phase={project.phase} />

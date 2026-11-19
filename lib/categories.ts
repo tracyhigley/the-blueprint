@@ -44,14 +44,36 @@ export type Destination = "ATM" | "COUNTER";
 // same shape as boxes, separately configured so the planning layer never
 // reshapes the daily engine's categories. A building can point at related
 // box keys later; for now the link is by convention only.
-export type Building = Box;
+//
+// A building can optionally carry "strategies" — named groups its Idea
+// projects sort into (e.g. the Press's five ways to sell more books). Buildings
+// without any look exactly as before.
+export type Strategy = { key: string; label: string };
+export type Building = Box & { strategies?: Strategy[] };
+
+function normalizeStrategies(raw: unknown): Strategy[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out = raw
+    .filter(
+      (s: any) =>
+        s && typeof s.key === "string" && s.key && typeof s.label === "string",
+    )
+    .map((s: any) => ({ key: s.key as string, label: s.label as string }));
+  return out.length > 0 ? out : undefined;
+}
 
 export async function getBuildings(): Promise<Building[]> {
   const sb = await supabaseServer();
   const { data } = await sb.from("settings").select("buildings").maybeSingle();
   const raw = (data?.buildings as any[]) ?? null;
   if (!raw || !Array.isArray(raw)) return [];
-  return raw.map(normalize).filter((b): b is Building => b !== null);
+  const out: Building[] = [];
+  for (const r of raw) {
+    const b = normalize(r);
+    if (!b) continue;
+    out.push({ ...b, strategies: normalizeStrategies(r?.strategies) });
+  }
+  return out;
 }
 
 // Convert a BUILDING_KEY → slug-case for URLs (mirrors the boxes hub).

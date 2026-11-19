@@ -38,6 +38,9 @@ export type Project = {
   // Project Plan dropdowns — 1, 2, or 3, null until set.
   priority: number | null;
   daysToBuild: number | null;
+  // Strategy key from the building's strategies (settings.buildings), null
+  // when the project hasn't been sorted into one.
+  strategy: string | null;
 };
 
 function envReady() {
@@ -98,6 +101,7 @@ function rowToProject(r: any): Project {
       typeof r.task_group_order === "number" ? r.task_group_order : null,
     priority: typeof r.priority === "number" ? r.priority : null,
     daysToBuild: typeof r.days_to_build === "number" ? r.days_to_build : null,
+    strategy: typeof r.strategy === "string" && r.strategy ? r.strategy : null,
   };
 }
 

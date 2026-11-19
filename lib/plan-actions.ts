@@ -64,7 +64,66 @@ export async function saveBuildingConfig(
   } catch (e) {
     throw new Error(describeZodError(e) ?? "Invalid building settings.");
   }
-  await sb.from("settings").upsert({ blueprint_id: blueprintId, buildings: parsed });
+  // The buildings editor doesn't know about strategies, so carry each
+  // building's existing ones over instead of wiping them on every save.
+  const { data: current } = await sb
+    .from("settings")
+    .select("buildings")
+    .eq("blueprint_id", blueprintId)
+    .maybeSingle();
+  const existing = new Map<string, unknown>(
+    ((current?.buildings as any[] | null) ?? []).map((b) => [
+      b?.key,
+      b?.strategies,
+    ]),
+  );
+  const merged = parsed.map((b) => {
+    const strategies = existing.get(b.key);
+    return strategies ? { ...b, strategies } : b;
+  });
+  await sb.from("settings").upsert({ blueprint_id: blueprintId, buildings: merged });
+  revalidatePath("/project-plans", "layout");
+  revalidatePath("/settings/buildings");
+}
+
+// One building's strategy groups. Read-modify-write on the buildings list so
+// editing these never disturbs the other buildings or their labels.
+const StrategyConfig = z.object({
+  key: z.string().min(1).max(40),
+  label: z.string().min(1).max(60),
+});
+
+export async function saveBuildingStrategies(
+  buildingKey: string,
+  strategies: z.input<typeof StrategyConfig>[],
+) {
+  const { sb } = await requireUser();
+  const blueprintId = await currentBlueprintId();
+  if (!blueprintId) throw new Error("No blueprint");
+  let parsed;
+  try {
+    parsed = strategies.map((s) => StrategyConfig.parse(s));
+  } catch (e) {
+    throw new Error(describeZodError(e) ?? "Invalid strategy.");
+  }
+  const { data } = await sb
+    .from("settings")
+    .select("buildings")
+    .eq("blueprint_id", blueprintId)
+    .maybeSingle();
+  const buildings = (data?.buildings as any[] | null) ?? [];
+  if (!buildings.some((b) => b?.key === buildingKey)) {
+    throw new Error("That building isn't in your settings.");
+  }
+  const next = buildings.map((b) => {
+    if (b?.key !== buildingKey) return b;
+    const { strategies: _old, ...rest } = b;
+    return parsed.length > 0 ? { ...rest, strategies: parsed } : rest;
+  });
+  const { error } = await sb
+    .from("settings")
+    .upsert({ blueprint_id: blueprintId, buildings: next });
+  if (error) throw new Error(error.message);
   revalidatePath("/project-plans", "layout");
   revalidatePath("/settings/buildings");
 }
@@ -172,6 +231,7 @@ export async function createProject(
   building: string,
   title: string,
   phase: z.input<typeof Phase> = "idea",
+  strategy: string | null = null,
 ) {
   const { sb, user } = await requireUser();
   const blueprintId = await currentBlueprintId();
@@ -184,6 +244,9 @@ export async function createProject(
     building,
     title: cleanTitle,
     phase: Phase.parse(phase),
+    // Only sent when set, so adding ideas keeps working even before the
+    // strategy column exists in the database.
+    ...(strategy ? { strategy } : {}),
   });
   if (error) throw new Error(error.message);
   revalidatePath("/project-plans", "layout");
@@ -228,6 +291,7 @@ const ProjectPatch = z.object({
   building: z.string().min(1).max(40).optional(),
   priority: z.number().int().min(1).max(3).nullable().optional(),
   days_to_build: z.number().int().min(1).max(3).nullable().optional(),
+  strategy: z.string().min(1).max(40).nullable().optional(),
 });
 
 export async function updateProjectPatch(
