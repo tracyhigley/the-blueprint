@@ -14,7 +14,9 @@ import {
   countSlots,
   emptyDay,
   formatPlanDate,
+  pickableForDropdown,
   planDates,
+  slottedProjectIds,
 } from "@/lib/ten-day-plan";
 import {
   TenDayPlanDay,
@@ -45,9 +47,12 @@ export default async function TenDayPlanPage() {
   }));
   const byId = new Map(planProjects.map((p) => [p.id, p]));
 
-  // Projects under construction or still in Planning can be picked: Under
-  // Construction first, then Planning; within each, best priority first
-  // (unset last), then by name.
+  // Projects under construction can be picked. Planning projects join the
+  // list only once every Under Construction project in that dropdown (Press,
+  // or Other buildings) is already slotted into the plan. Under Construction
+  // first, then Planning; within each, best priority first (unset last),
+  // then by name.
+  const slotted = slottedProjectIds(plan);
   const pickable = projects
     .filter((p) => p.phase === "building" || p.phase === "planning")
     .sort(
@@ -56,15 +61,17 @@ export default async function TenDayPlanPage() {
         (a.priority ?? 99) - (b.priority ?? 99) ||
         a.title.localeCompare(b.title),
     );
-  const pressChoices = pickable
-    .filter((p) => p.building === PRESS_BUILDING_KEY)
-    .map((p) => byId.get(p.id)!);
-  const otherChoices = pickable
-    .filter(
+  const pressChoices = pickableForDropdown(
+    pickable.filter((p) => p.building === PRESS_BUILDING_KEY),
+    slotted,
+  ).map((p) => byId.get(p.id)!);
+  const otherChoices = pickableForDropdown(
+    pickable.filter(
       (p) =>
         p.building !== PRESS_BUILDING_KEY && p.building !== LIBRARY_BUILDING_KEY,
-    )
-    .map((p) => byId.get(p.id)!);
+    ),
+    slotted,
+  ).map((p) => byId.get(p.id)!);
 
   // Open Maint Tasks by building — same filter the old This Week page used
   // (no project-linked items, custom blocks, done items, or the daily

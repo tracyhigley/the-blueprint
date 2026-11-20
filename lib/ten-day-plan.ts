@@ -145,6 +145,33 @@ export function countSlots(plan: TenDayPlan): { worked: number; total: number } 
   return { worked, total };
 }
 
+// Every project already picked on a normal project day of the plan. Days set
+// to "No Project Work" / "Maintenance Only" don't count: their slots are hidden.
+export function slottedProjectIds(plan: TenDayPlan): Set<string> {
+  const ids = new Set<string>();
+  for (const day of Object.values(plan.days)) {
+    if (day.mode) continue;
+    for (const slot of [day.press, ...day.others]) {
+      if (slot) ids.add(slot.projectId);
+    }
+  }
+  return ids;
+}
+
+// What a dropdown offers: Under Construction projects only, until every one of
+// them is slotted into the plan; then Planning projects open up too (Under
+// Construction stay listed first, since a multi-day build needs more days).
+// `projects` must already be in display order. Idea / Complete never appear.
+export function pickableForDropdown<
+  T extends { id: string; phase: string },
+>(projects: T[], slotted: Set<string>): T[] {
+  const building = projects.filter((p) => p.phase === "building");
+  const allSlotted = building.every((p) => slotted.has(p.id));
+  return projects.filter(
+    (p) => p.phase === "building" || (allSlotted && p.phase === "planning"),
+  );
+}
+
 export function planHasAnyEntries(plan: TenDayPlan): boolean {
   return Object.values(plan.days).some(
     (d) => d.mode || d.press || d.others.some(Boolean),

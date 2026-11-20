@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   countSlots,
   normalizePlan,
+  pickableForDropdown,
   planDates,
+  slottedProjectIds,
   type TenDayPlan,
 } from "./ten-day-plan";
 
@@ -37,5 +39,54 @@ describe("countSlots", () => {
     });
     // 10 days, 2 opted out → 8 project days × 3 slots.
     expect(countSlots(plan)).toEqual({ worked: 2, total: 24 });
+  });
+});
+
+describe("pickableForDropdown", () => {
+  const projects = [
+    { id: "a", phase: "building" },
+    { id: "b", phase: "building" },
+    { id: "c", phase: "planning" },
+    { id: "d", phase: "idea" },
+  ];
+
+  it("offers only Under Construction while any is unslotted", () => {
+    const ids = pickableForDropdown(projects, new Set(["a"])).map((p) => p.id);
+    expect(ids).toEqual(["a", "b"]);
+  });
+
+  it("opens up Planning once every Under Construction one is slotted", () => {
+    const ids = pickableForDropdown(projects, new Set(["a", "b"])).map(
+      (p) => p.id,
+    );
+    expect(ids).toEqual(["a", "b", "c"]);
+  });
+
+  it("opens Planning when nothing is under construction", () => {
+    const ids = pickableForDropdown([projects[2], projects[3]], new Set()).map(
+      (p) => p.id,
+    );
+    expect(ids).toEqual(["c"]);
+  });
+});
+
+describe("slottedProjectIds", () => {
+  it("collects picks from project days and ignores opt-out days", () => {
+    const plan = normalizePlan({
+      start: "2026-11-19",
+      days: {
+        "2026-11-19": {
+          mode: null,
+          press: { projectId: "p1", worked: false },
+          others: [{ projectId: "o1", worked: false }, null],
+        },
+        "2026-11-20": {
+          mode: "none",
+          press: { projectId: "p2", worked: false },
+          others: [null, null],
+        },
+      },
+    });
+    expect([...slottedProjectIds(plan)].sort()).toEqual(["o1", "p1"]);
   });
 });
