@@ -116,12 +116,13 @@ export default async function AllProjectPlansPage() {
             I do not need to see everything at once!
           </p>
           <p className="text-ink-dim mt-2">
-            Each work day I hope to get 2 focused hours on Writing, 3 focused
-            hours on The Press, and 3 focused hours on other buildings,
-            including their maintenance tasks.
+            Each workday I hope to get 2 focused hours on Writing, and 4
+            focused hours on Projects, and have about 1 hour of Maint Tasks I
+            must do.
           </p>
           <p className="text-ink-dim mt-2">
-            This 8 hours should be plenty to move projects along very well.
+            This 6 hours of focused work should be plenty to move projects along
+            very well.
           </p>
           <p className="text-ink-dim mt-2">
             {runOutAt ? (
